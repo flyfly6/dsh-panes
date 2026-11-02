@@ -20,8 +20,8 @@
 
 ## 3. 客户端笔记 UI
 
-- [ ] 注册 `ternTabs` 类型 `note`（`contentId: 'note:<relPath>'`，order 50）。
-- [ ] 注册 `ternTabs` 类型 `notes`（笔记列表页：搜索框 + 排序 + 新建 + 列表项），`+` 菜单直达。
+- [ ] 注册 `workbenchTabs` 类型 `note`（`contentId: 'note:<relPath>'`，order 50）。
+- [ ] 注册 `workbenchTabs` 类型 `notes`（笔记列表页：搜索框 + 排序 + 新建 + 列表项），`+` 菜单直达。
 - [ ] Notion 编辑器：大标题（32px）+ 标签行 + 块序列；块内编辑用 contentEditable 或 textarea 逐块实现（不引富文本框架）。
 - [ ] 行首快捷：`# ` / `- ` / `> ` / ` ``` ` 转块；回车新建段落；待办可勾选；代码块语言可切。
 - [ ] 块手柄：hover 显示 `⋮⋮`，点击弹块菜单（删除 / 转类型 / 复制）。
@@ -38,7 +38,7 @@
 
 ```powershell
 pnpm build
-dsh plugin --profile desktop add C:\projects\dsh-workspace\dsh-tern-workspace
+dsh plugin --profile desktop add C:\projects\dsh-workspace\dsh-workbench
 ```
 
 - [ ] 首次进入自动建库；新建 → 编辑 → 自动保存 → 刷新后内容与标题一致。

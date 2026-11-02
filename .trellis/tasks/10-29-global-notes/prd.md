@@ -4,7 +4,7 @@
 
 提供 Notion 风格的全局 Markdown 笔记：一条笔记一个 `.md` 文件，存放在可配置的笔记库（默认 `$DSH_HOME/notes`）；在 Workspace 面板里以 `note` tab 打开，**单栏所见即所得**编辑（大标题 + 块式正文），笔记列表作为独立的 `notes` tab。跨工作区共享。
 
-父任务：`10-29-tern-workspace-plugin`（宿主路由与安全约定见父任务 `design.md`；设计稿 `lgBsZ` / 深色 `AfEbo`）。依赖 T1 的 `ternTabs` 注册契约。
+父任务：`10-29-workbench-plugin`（宿主路由与安全约定见父任务 `design.md`；设计稿 `lgBsZ` / 深色 `AfEbo`）。依赖 T1 的 `workbenchTabs` 注册契约。
 
 ## Requirements
 

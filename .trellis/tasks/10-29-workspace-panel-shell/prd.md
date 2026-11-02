@@ -4,7 +4,7 @@
 
 注册一个全屏 Workspace 主面板，按**项目侧栏 + tab 工作区**布局建立三套契约：项目模型（复用宿主 workspace 注册表）、tab 类型注册、按项目隔离的 tab 集合。在其上交付项目列表与 `+` 新建菜单、Explorer（文件树）、Search（内容检索）、语法高亮代码视图、Markdown 渲染预览，以及终端 / 浏览器 / 会话三种 tab。
 
-父任务：`10-29-tern-workspace-plugin`（架构与宿主契约见父任务 `design.md`，设计稿见 `designs/tern-workspace.pen`）。
+父任务：`10-29-workbench-plugin`（架构与宿主契约见父任务 `design.md`，设计稿见 `designs/workbench.pen`）。
 
 ## Requirements
 
@@ -13,7 +13,7 @@
 - **R1.3 项目模型**：项目来自宿主 workspace 注册表（`ctx.workspace`），侧栏每行显示名称 / 路径 / tab 数 / running 标记；支持过滤、`Add project`（走宿主目录选择器）、切换。不新建项目注册表。
 - **R1.4 项目维度 tab 集合**：每个项目独立维护 `{ tabs, activeTabId, closed, sidebar }`；切换项目即切换整套 tab；布局持久化到 localStorage（`schemaVersion: 2`），刷新后恢复。
 - **R1.5 tab 模型**：支持打开 / 切换 / 关闭 / 重命名 / 拖动重排 / 重开（最近 10 条）；同一 `{kind, contentId}` 复用并激活；tab 类型至少含 `session / file / explorer / search / terminal / browser / git / note`（后两个由 T2/T3 注册）。
-- **R1.6 tab 类型注册契约**：`ternTabs.register({kind, icon, order, match, create, children})`；新增类型不改面板壳代码。T2/T3 依赖此契约。
+- **R1.6 tab 类型注册契约**：`workbenchTabs.register({kind, icon, order, match, create, children})`；新增类型不改面板壳代码。T2/T3 依赖此契约。
 - **R1.7 `+` 菜单**：Session / Open file… / Explorer / Terminal / Browser / Source Control / Note，另含 New note / New project；新建的 tab 落在当前项目。
 - **R1.8 文件树（Explorer tab）**：以当前项目根懒加载目录（`workspaceFiles.list`），默认隐藏 `.git`/`node_modules`/`.next`/`dist`（可配置）；图标按类型着色；单击打开文件 tab；右键菜单：打开、在树中定位、复制路径、在系统打开。
 - **R1.9 文件名搜索**：`Ctrl+P` 快速打开，模糊匹配（宿主 `search` op `mode:'name'`），上限 50，回车打开第一条。

@@ -1,8 +1,8 @@
-# Tern-like Workspace Plugin
+# Workspace Workbench Plugin
 
 ## Goal
 
-交付一个可安装的 dsh 插件，把 DeepSeek Harness 客户端变成 Tern 式工作台：在一个全屏、tab 化的 Workspace 面板里浏览与检索项目代码（多语言语法高亮、Markdown 渲染预览），把文件 / 终端 / 会话 / 浏览器 / Git / 笔记统一组织成可切换、可持久化的 tab；并提供 Git 基本操作与提交图、以及全局的 Notion 风格 Markdown 笔记。
+交付一个可安装的 dsh 插件，把 DeepSeek Harness 客户端变成一个多 tab 的工作台：在一个全屏、tab 化的 Workspace 面板里浏览与检索项目代码（多语言语法高亮、Markdown 渲染预览），把文件 / 终端 / 会话 / 浏览器 / Git / 笔记统一组织成可切换、可持久化的 tab；并提供 Git 基本操作与提交图、以及全局的 Notion 风格 Markdown 笔记。
 
 用户价值：把编码过程中「看代码、搜代码、跑命令、查页面、提交、记笔记」这些动作从多窗口来回切换收敛到同一处，并用 tab 保存工作现场，刷新或换会话后能恢复。
 
@@ -10,7 +10,7 @@
 
 取证材料在 `research/dsh-asar/`（从本机 `resources/app.asar` 中 dsh `0.2.1-rc.3` 提取的官方包 README / package.json / client bundle 片段），结论：
 
-- **插件 = cordis 包的宿主半边 + 浏览器半边**。宿主半边 `lib/index.js`；浏览器半边 `lib/client.js` 由 `package.json` 的 `dsh.client`（`platform: web`、`inject`、可选 `external`）声明，经 `dsh-client-modules` 组进 boot graph 并用 `window.__ModuleLoader__.load({ id, factory })` 注册；`dsh.bundle.patch` 指向 `cordis.patch.yml` 的 `- insert:` 行，`dsh plugin --profile <p> add <spec>` 即可安装（支持本地绝对路径）。
+- **插件 = cordis 包的宿主半边 + 浏览器半边**。宿主半边 `lib/index.js`；浏览器半边 `lib/client.js` 由 `package.json` 的 `dsh.client`（`platform: web`、`inject`、可选 `exworkbenchal`）声明，经 `dsh-client-modules` 组进 boot graph 并用 `window.__ModuleLoader__.load({ id, factory })` 注册；`dsh.bundle.patch` 指向 `cordis.patch.yml` 的 `- insert:` 行，`dsh plugin --profile <p> add <spec>` 即可安装（支持本地绝对路径）。
 - **可以注册全屏主面板**：`ctx.slots.inject('main', function* () { yield ctx.slots.register({ name: 'main', key, label, locale, store, children }, Component) })`，`ctx.layout.selectPanel(key)` 切换，`selectPanel(null)` 回会话；注册的 `main` 面板会自动出现在左侧栏的面板列表里（每行图标来自 `sidebar.panellist` slot）。官方 Plugins 页就是这样挂的。
 - **宿主已提供数据能力**：`remote.workspaceFiles` 的 `read`（按行分页、带 version/eof）、`readBytes`、`stat`、`list`（仅目录直接子项）、`changes`（文件/目录 watch 流）；`/api/file` 取绝对路径文件；`dsh-api-terminal-controller` 管用户终端；`dsh-client-ui-sidebar-browser` 已实现 iframe/webview 两类浏览器承载；`dsh-subprocess` 可起子进程；`dsh-storage-json`/`dsh-storage-domain` 可持久化；宿主插件可注册 HTTP 路由（官方与第三方实例都用 `/dsh-<name>/api` + `x-dsh-plugin` 头做 CSRF 门）。
 - **已内置但形态受限的能力**：右侧栏本身是带 tab 的 dock，已有 Files / Document Preview（Markdown、代码、图片、PDF、Office、HTML）/ Terminal / Browser 四种 tab 类型；这些 tab 绑定在 `sidebarRightTabs` 与 per-session dock 上，宽 264–420px，**不是**可自由组织的整屏工作台，也**不能**把会话放进去。
@@ -31,7 +31,7 @@
 - **D9 主题**：浅色为默认，深色同构换肤；两套共用一组语义 token，代码高亮也随主题切换（GitHub Light / Dark 两套配色）。
 - **D10 与 dsh 默认页的关系**：本面板是宿主 `main` slot 里的一个**全局面板**，与「插件 / 自动化任务 / 记忆系统 / MCP 连接器」平级：`ctx.layout.selectPanel(id)` 互切，`selectPanel(null)` 回会话。进入时自动折叠 dsh 左侧栏（否则会出现双左栏），离开时恢复；面板内提供返回入口与「应用」区（动态列出宿主已注册的 `main` 面板，点击即切换，不硬编码任何插件名）。**启动默认直接进入 Workspace**（`startup: 'workspace'`），设置项可改为 `last`（记住上次）或 `conversation`（保持 dsh 默认）。
 
-- **D11 设计已确认（2026-11-02）**：9 屏设计稿（P1–P9）与 8 屏深色版（D1–D8）经用户逐轮确认定稿，见 `designs/tern-workspace.pen` 与 `designs/exports/`。实现阶段以 `design.md` §2.0b–§2.0f 为准，不得偏离既定 IA（项目侧栏 + tab 工作区）与视觉规格。
+- **D11 设计已确认（2026-11-02）**：9 屏设计稿（P1–P9）与 8 屏深色版（D1–D8）经用户逐轮确认定稿，见 `designs/workbench.pen` 与 `designs/exports/`。实现阶段以 `design.md` §2.0b–§2.0f 为准，不得偏离既定 IA（项目侧栏 + tab 工作区）与视觉规格。
 
 ## Task Map
 
@@ -76,7 +76,7 @@
 
 ## Out of Scope
 
-- 代码编辑与保存回写、LSP 补全/跳转定义/重构（Tern 以查看为主）。
+- 代码编辑与保存回写、LSP 补全/跳转定义/重构（工作台以查看为主）。
 - push / pull 等远程写操作：fork 代码内保留实现，但 v1 UI 默认隐藏且不做凭据/冲突验证。
 - 交互式 rebase、submodule、LFS、三方冲突解决编辑器、多仓库并行管理。
 - 笔记的协作、云同步、Notion database 视图、块级拖拽富文本。

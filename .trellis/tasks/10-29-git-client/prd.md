@@ -4,11 +4,11 @@
 
 把 fork 进来的 `dsh-ide-git`（MIT，v0.21.1）宿主半与客户端面板接进 Workspace：注册 `git` tab 类型，得到一个 **JetBrains 式 Git 工具窗口** —— 左侧 IDEA 动作条 + 分支树 + 提交列表/图谱 + 变更分组与提交框同屏。配置项进插件配置页的 Git 分组。
 
-父任务：`10-29-tern-workspace-plugin`（fork 策略见 `design.md` §3.4，配置页见 §2.0f）。依赖 T1 的 `ternTabs` 注册契约。
+父任务：`10-29-workbench-plugin`（fork 策略见 `design.md` §3.4，配置页见 §2.0f）。依赖 T1 的 `workbenchTabs` 注册契约。
 
 ## Requirements
 
-- **R2.1 接入与注册**：宿主半以 `ctx.plugin(gitHost)` 挂载并保留 `/dsh-ide-git/api/<method>` 前缀路由；客户端面板注册为 `ternTabs` 的 `git` 类型（`contentId: 'git:<repoRoot>'`，幂等）；不依赖 `dsh-better-sidebar`，也不占用项目侧栏（分支树与变更都在 tab 内部）。
+- **R2.1 接入与注册**：宿主半以 `ctx.plugin(gitHost)` 挂载并保留 `/dsh-ide-git/api/<method>` 前缀路由；客户端面板注册为 `workbenchTabs` 的 `git` 类型（`contentId: 'git:<repoRoot>'`，幂等）；不依赖 `dsh-better-sidebar`，也不占用项目侧栏（分支树与变更都在 tab 内部）。
 - **R2.2 仓库识别**：以当前会话工作区为 `cwd` 定位仓库根（工作区可为仓库子目录）；非 git 仓库显示空状态；`git` 不存在/超时/非仓库分别返回可读错误码。
 - **R2.3 分支树**：`HEAD / 本地 / 远程 / 标签` 分组、可折叠、过滤框、当前分支星标、ahead/behind 角标、worktree 占用标记；本地蓝 / 远程紫 / 标签黄 / HEAD 绿。
 - **R2.4 提交列表与图谱**：列序对齐 IDEA（日期 → 提交人 → 图谱 → 分支标签 → 提交信息）；lane 拓扑连线、HEAD 空心点、refs 徽章（最多 3 + `+n`）；分页/无限滚动（120/页）；筛选（文本/哈希、分支或标签、提交人、日期、排序方向）。
@@ -44,6 +44,6 @@
 
 ## Dependencies / Risks
 
-- 依赖 T1 的 `ternTabs` / `views` 契约；依赖父任务 §1b 的 vendor 完成。
+- 依赖 T1 的 `workbenchTabs` / `views` 契约；依赖父任务 §1b 的 vendor 完成。
 - 若 S5（ui-primitives）不可用：diff 与文件图标走自带降级渲染（上游已如此设计）。
 - 若 S6（改造后跑不通）：收敛为「先接 summary/branches/log 三方法」，其余功能逐步放开；最终退路是「只依赖 dsh-ide-git + 跳转入口」。

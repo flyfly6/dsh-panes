@@ -20,7 +20,7 @@ PowerShell 读法见本任务历史命令（`[System.IO.File]::OpenRead` + `BitC
 
 ## 2. 插件契约（结论）
 
-- 包结构：`main: lib/index.js`（宿主半边）+ `exports["./client"]: lib/client.js`（浏览器半边）+ `dsh.bundle.patch` → `cordis.patch.yml` 的 `- insert:` 行 + `dsh.client{platform:'web', inject:[...], external?:[...]}`。
+- 包结构：`main: lib/index.js`（宿主半边）+ `exports["./client"]: lib/client.js`（浏览器半边）+ `dsh.bundle.patch` → `cordis.patch.yml` 的 `- insert:` 行 + `dsh.client{platform:'web', inject:[...], exworkbenchal?:[...]}`。
 - 客户端 bundle 形态：`const factory = (require) => { ...; return module.exports }; window.__ModuleLoader__.load({ id, factory })`，id 要与 Loader entry 的 id 一致（官方包用自己的包名）。
 - 运行时 API 名：`ctx.slots`（`register/inject/entries/subscribe/getVersion`）、`ctx.layout`（`selectPanel/panelInfo/openRightbar`）、`ctx.locale`、`ctx.remote`、`ctx.reflect.provide`、`ctx.effect`、`ctx.get('slots')`（第三方写法）。
 - **全屏主面板注册**（官方 `ui-plugin-manager` 的写法，`lib/client.js` 第 ~4411 行）：
@@ -73,7 +73,7 @@ ctx.layout.selectPanel(PANEL_ID)
 
 ## 7. 上游参考实现：dsh-ide-git（fork 来源）
 
-`https://github.com/KannaKuron/dsh-ide-git`，MIT，抓取时版本 **v0.21.1**（package.json 与 dsh.plugin.json 一致，id `dsh-external/dsh-ide-git`）。
+`https://github.com/KannaKuron/dsh-ide-git`，MIT，抓取时版本 **v0.21.1**（package.json 与 dsh.plugin.json 一致，id `dsh-exworkbenchal/dsh-ide-git`）。
 
 - 形态：`main: src/index.js`（宿主半）+ `exports['./client']: src/client.js`（客户端半，**无构建单文件**）+ `cordis.patch.yml`（`- insert: [{ id: ide-git, name: 'dsh-ide-git' }]`）+ `exports['./package.json']`（缺了客户端进不了 boot graph，上游 issue #2）。
 - 宿主半：前缀路由 `POST /dsh-ide-git/api/<method>`，方法表约 32 个（`summary/branches/log/commitDetail/diff/compare/stage/commit/checkout/branch*/tag*/stash*/fetch/pull/push/reset/revert/cherry-pick/commit-models/commit-efforts/version` …）；全部 `spawn('git', argv)`，无 shell 字符串；同仓写操作串行；diff 输出上限 400KB；含「AI 生成提交信息」特性（`ctx.inject(['llm','sessions'])`，模型与 effort 走 row Config）。
@@ -83,3 +83,17 @@ ctx.layout.selectPanel(PANEL_ID)
 - 交互资产（我们要保留的）：IDEA 列序提交列表 + lane 图谱、分支树分组与右键、变更四分组 + 提交框 + `--amend`、动作条按高度收纳 + `⚙` 排序显隐、删除分支/贮藏 30 分钟可撤回、21 语言词典、diff 选区右键「发送到对话」（依赖 `ctx.get('conversation')` 的 composer facade，**fork 时按需保留**）。
 - 明确不做的（上游自称）：交互式 rebase、三方冲突编辑器、submodule/LFS、blame、worktree 视图、多选批量操作、部分提交。
 - fork 决策（D8）：两半整体 vendor 进 `src/git/`，注册改造为我们的 `git` tab + `views` 视图；push/pull 默认隐藏（`experimentalRemoteOps` 开关）；`src/git/UPSTREAM.md` 记录同步基线与补丁点。
+
+## 8. Spike 结论（2026-11-03，跑在隔离 profile `workbench-spike`，未动 desktop）
+
+跑法：`dsh --profile workbench-spike --from-default-profile web` 建沙箱 profile → `dsh plugin --profile workbench-spike add <abs-path>` → 包名加进 `dsh.profile.bundles` → `dsh --profile workbench-spike --port 57433` 起服务 → agent-browser 实测。
+
+| # | 结论 | 证据 |
+|---|---|---|
+| S1 | **通过**，但有一个必须知道的点：**只注册 `main` 不出现任何入口**。侧栏行由 `sidebar.panellist` 列表槽单独提供（`id` 必须等于 `main` 的 `key`，`label` 用 thunk 跟语言，图标组件收到 `{size, active}`）。两个槽一起注册才等于「面板 + 入口」。 | 只注册 `main` → nav 只有「插件/自动化任务/更多」；补 `sidebar.panellist` → nav 出现「工作台」，点开面板渲染正常 |
+| S2 | **shiki / @xterm/xterm 不在共享模块表**（`require` 抛错）；`react`、`@deepseek-ai/dsh-client-ui-primitives` 可用。→ 高亮与终端必须自带打包进 `lib/client.js`（design 的回退分支，非可选项）。 | 面板内 probe：`react=yes · ui-primitives=yes · shiki=no · @xterm/xterm=no` |
+| S4 | **通过（半）**：本地目录安装 = pnpm 软链 + profile `dsh.profile.bundles` 加一行，重启客户端后被组进 boot graph；已装插件改 `lib/client.js` 后**刷新页面**即生效（HMR 在）。新增 bundle 不改代码不生效，需重启进程。 | 两次 boot 对比；重构建 + reload 后侧栏入口立即出现 |
+| S5 | **通过**：`@deepseek-ai/dsh-client-ui-primitives` 可 require（diff / 文件图标可直接用，不必自绘）。 | 同 S2 probe |
+| S10/S11 | 未测，留给 T1 | — |
+
+宿主半边补充：`ctx.webServer.register({ kind: 'prefix', path, handler })` + `export const inject = ['webServer']` 是可用写法；浏览器侧 `fetch` 带 `x-dsh-plugin` 头能打通自有路由（面板里「宿主连接: 正常」）。

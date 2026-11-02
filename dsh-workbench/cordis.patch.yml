@@ -1,0 +1,5 @@
+# dsh-workbench bundle patch: mount the host half. `name` is the package
+# name, resolved through the profile's node_modules.
+- insert:
+    - id: workbench
+      name: dsh-workbench

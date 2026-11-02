@@ -1,12 +1,12 @@
 # Implementation Plan — T1 Workspace Panel Shell + Code View/Search
 
-> 技术设计与宿主契约以父任务 `10-29-tern-workspace-plugin/design.md` 为准；设计稿 `designs/tern-workspace.pen`（P1/P2/P5/P6/P7）。
+> 技术设计与宿主契约以父任务 `10-29-workbench-plugin/design.md` 为准；设计稿 `designs/workbench.pen`（P1/P2/P5/P6/P7）。
 
 ## 1. 面板壳 + 启动进入
 
-- [ ] `lib/client.js`：ModuleLoader 工厂 + locale 注册 + `ctx.slots.inject('main', …)` 注册 `main` 面板（key `tern-workspace`）。
+- [ ] `lib/client.js`：ModuleLoader 工厂 + locale 注册 + `ctx.slots.inject('main', …)` 注册 `main` 面板（key `workbench`）。
 - [ ] 骨架：`Sidebar | (TabBar / Breadcrumb / Content) / StatusBar`，处理 `--dsh-frame-top-clearance`。
-- [ ] 启动进入：`config.startup === 'workspace'`（默认）时 layout ready 后 `selectPanel('tern-workspace')`，并收起 dsh 左栏（S10 结论决定是否可程序化）。
+- [ ] 启动进入：`config.startup === 'workspace'`（默认）时 layout ready 后 `selectPanel('workbench')`，并收起 dsh 左栏（S10 结论决定是否可程序化）。
 - [ ] 返回：`selectPanel(null)` + 恢复左栏；`Esc` 仅在面板聚焦且无弹层时生效。
 - [ ] 验证：安装 → dsh 左栏出现入口 → 打开即进入 → 控制台无报错（S1）。
 
@@ -20,7 +20,7 @@
 ## 3. tab 模型 + `+` 菜单
 
 - [ ] `tabs` store：`open/close/activate/rename/move/reopenLast`，按 `${projectId}:${kind}:${contentId}` 去重。
-- [ ] `ternTabs` 注册表 + `create` 契约（T2/T3 依赖）。
+- [ ] `workbenchTabs` 注册表 + `create` 契约（T2/T3 依赖）。
 - [ ] `+` 菜单：Session / Open file / Explorer / Terminal / Browser / Source Control / Note / New note / New project。
 - [ ] localStorage `schemaVersion: 2`（activeProjectId + projects 映射）；读回时丢弃未知 kind。
 - [ ] 快捷键：`Ctrl+Tab` / `Ctrl+W` / `Ctrl+Shift+T` / `Ctrl+B`，终端聚焦时让位。
@@ -60,7 +60,7 @@
 
 ```powershell
 pnpm build
-dsh plugin --profile desktop add C:\projects\dsh-workspace\dsh-tern-workspace
+dsh plugin --profile desktop add C:\projects\dsh-workspace\dsh-workbench
 # 手工跑 T1 Acceptance Criteria
 ```
 

@@ -1,16 +1,16 @@
-# Technical Design — Tern-like Workspace Plugin
+# Technical Design — Workspace Workbench Plugin
 
 > 父任务设计。子任务共享本文件的包结构、tab 契约与宿主 API 契约；子任务只在自己的 `implement.md` 里写增量清单。
 
 ## 1. 形态与边界
 
-单个 npm 包 `dsh-tern-workspace`（可发布结构，v1 用本地目录安装）：
+单个 npm 包 `dsh-workbench`（可发布结构，v1 用本地目录安装）：
 
 ```
-dsh-tern-workspace/
+dsh-workbench/
 ├─ package.json          # main: lib/index.js, exports["./client"]: lib/client.js,
-│                        # dsh.bundle.patch, dsh.client{platform,inject,external}
-├─ cordis.patch.yml      # - insert: [{ id: tern-workspace, name: dsh-tern-workspace }]
+│                        # dsh.bundle.patch, dsh.client{platform,inject,exworkbenchal}
+├─ cordis.patch.yml      # - insert: [{ id: workbench, name: dsh-workbench }]
 ├─ lib/
 │  ├─ index.js           # 宿主半边入口：组合 search / notes / 挂载 fork 进来的 git 半
 │  ├─ client.js          # 浏览器半边入口：VSCode 式 shell + 各 tab 类型
@@ -24,7 +24,7 @@ dsh-tern-workspace/
 └─ README.md
 ```
 
-- **宿主半边职责**：注册 HTTP 路由 `/dsh-tern-workspace/api`（唯一前端入口）、执行 git、执行内容检索、读写笔记库、目录列表加速、配置读写。全部通过 cordis 服务（`ctx.fs`、`ctx.subprocess`、`ctx.storage`）而不是裸 `node:fs`，以便继承沙箱与工作区语义。
+- **宿主半边职责**：注册 HTTP 路由 `/dsh-workbench/api`（唯一前端入口）、执行 git、执行内容检索、读写笔记库、目录列表加速、配置读写。全部通过 cordis 服务（`ctx.fs`、`ctx.subprocess`、`ctx.storage`）而不是裸 `node:fs`，以便继承沙箱与工作区语义。
 - **浏览器半边职责**：注册 `main` 面板与左侧栏入口、tab 模型与渲染、代码高亮、Markdown 渲染、diff 渲染、笔记编辑器、调用宿主 API。
 - **不修改宿主**：不碰 `app.asar`、不改 profile 里其他 bundle；只通过 `dsh plugin add` 追加自己的依赖与 bundle 行。
 
@@ -81,7 +81,7 @@ openTab(projectId, {kind, contentId}):
 
 ### 2.0b 视觉设计稿（已确认）
 
-设计稿：`designs/tern-workspace.pen`；导出图在 `designs/exports/`。**一套结构 × 两套主题**：颜色全部走变量，深色版是对同一屏设置 `theme:{mode:'dark'}` 得到，不是重画。
+设计稿：`designs/workbench.pen`；导出图在 `designs/exports/`。**一套结构 × 两套主题**：颜色全部走变量，深色版是对同一屏设置 `theme:{mode:'dark'}` 得到，不是重画。
 
 | 屏 | 节点 | 内容 | 覆盖 |
 |---|---|---|---|
@@ -122,7 +122,7 @@ openTab(projectId, {kind, contentId}):
 |---|---|---|
 | 文本长度 | 固定示例（`WorkspacePanel.tsx`、`4 个子智能体`） | 单行省略 + hover 显示全名；tab 宽度设 min/max，超出横向滚动 |
 | 内容高度 | 固定 900 | 内容区 `flex:1` + 内部滚动；代码/列表虚拟滚动 |
-| 滚动条 | 未画 | 自定义 6px 细滚动条，颜色取 `--tern-border-strong`，hover 加深 |
+| 滚动条 | 未画 | 自定义 6px 细滚动条，颜色取 `--workbench-border-strong`，hover 加深 |
 | 空状态 / 加载态 | 未画 | 每种 tab 一张空状态（图标 + 一句引导 + 主按钮） |
 | 焦点态 | 未画 | 键盘 focus ring：accent 2px、offset -2，不加额外阴影 |
 | 拖拽反馈 | 未画 | tab 拖动半透明 + 落点 2px accent 竖线；侧栏拖拽时手柄变 accent |
@@ -133,16 +133,16 @@ openTab(projectId, {kind, contentId}):
 2. **图标**：设计稿用 lucide。实现打包 `lucide-react`（tree-shaking 后约 15–25KB）；个别名字有版本差异（`file-diff`、`panel-left-close`）需核对替换或自绘 3–5 个。
 3. **宿主窗口 chrome**：Desktop 顶部 48px 标题栏 / macOS 红绿灯，设计稿没画。面板必须按 `--dsh-frame-top-clearance` 留白，实际顶部会比设计稿多一条空白 —— 这是宿主要求，不能压掉。
 
-**token 落地**：pen 变量名 → 插件 CSS 变量 `--tern-*` → 再映射宿主变量。
+**token 落地**：pen 变量名 → 插件 CSS 变量 `--workbench-*` → 再映射宿主变量。
 
 ```css
 :root {
-  --tern-bg-app: var(--dsw-alias-bg-base);
-  --tern-bg-sidebar: var(--dsw-alias-bg-layer-2, #FAFAFB);
-  --tern-accent: var(--dsw-alias-brand-primary, #3B6FF5);
-  --tern-code-keyword: #CF222E;      /* 宿主没有的语义色才硬编码，双份 */
+  --workbench-bg-app: var(--dsw-alias-bg-base);
+  --workbench-bg-sidebar: var(--dsw-alias-bg-layer-2, #FAFAFB);
+  --workbench-accent: var(--dsw-alias-brand-primary, #3B6FF5);
+  --workbench-code-keyword: #CF222E;      /* 宿主没有的语义色才硬编码，双份 */
 }
-body[data-ds-dark-theme] { --tern-code-keyword: #FF7B72; }
+body[data-ds-dark-theme] { --workbench-code-keyword: #FF7B72; }
 ```
 
 **验收方法**：实现后在 1440×900 下截图，与 `designs/exports/*.png` 叠图对比（容差：布局 ≤2px、颜色 ≤3ΔE），六个主屏逐一过，写进 T1 验收项。
@@ -155,7 +155,7 @@ body[data-ds-dark-theme] { --tern-code-keyword: #FF7B72; }
 | 组件写法 | TSX，构建时编译成 `React.createElement` | 与官方插件一致；源码可读性优先 |
 | 组件库 | **shadcn/ui**（源码进 `src/components/ui/`，底层 Radix primitives） | 无障碍、键盘交互、焦点管理都是现成的；样式可完全接管，不锁死视觉 |
 | 样式 | **Tailwind CSS**（构建期编译）+ shadcn 语义变量，产物内联成字符串注入 `<style data-plugin-css>` | shadcn 的组件代码就是 Tailwind 类名，绕开它等于重写组件 |
-| 样式隔离 | Tailwind **禁用 preflight**；所有组件挂 `.tern-root` 作用域 | preflight 会全局重置标签样式，必然污染宿主 UI |
+| 样式隔离 | Tailwind **禁用 preflight**；所有组件挂 `.workbench-root` 作用域 | preflight 会全局重置标签样式，必然污染宿主 UI |
 | 状态 | React state + Context；跨 tab 共享的布局用宿主 snapshot store | 面板内状态量不大，先不上 zustand |
 | 图标 | `lucide-react`（tree-shaken，shadcn 默认图标集） | 设计稿就是 lucide，一套图形语言 |
 | 字体 | 打包 Inter + JetBrains Mono 的 woff2 subset，`@font-face` 注入插件样式表 | 不打包会掉到系统字体，密集列表走形（见 §2.0c） |
@@ -172,7 +172,7 @@ body[data-ds-dark-theme] { --tern-code-keyword: #FF7B72; }
 2. **把 shadcn 的语义变量映射到宿主**，而不是用它的默认调色板：
 
 ```css
-.tern-root {
+.workbench-root {
   --background: var(--dsw-alias-bg-base);
   --foreground: var(--dsw-alias-text-primary);
   --card: var(--dsw-alias-bg-layer-2);
@@ -206,15 +206,15 @@ font.code.lineHeight  1.5 | 1.6 | 1.8
 变量只在面板根节点覆盖，不影响宿主其他区域：
 
 ```css
-.tern-root {
-  --tern-font-ui: var(--dsh-font-family-sans, 'Inter', system-ui, sans-serif);
-  --tern-font-code: var(--dsh-font-family-mono, 'JetBrains Mono', ui-monospace);
-  --tern-font-ui-size: var(--dsh-content-font-size, 13px);
-  --tern-font-code-size: var(--dsh-code-font-size, 12px);
-  --tern-code-line-height: 1.6;
+.workbench-root {
+  --workbench-font-ui: var(--dsh-font-family-sans, 'Inter', system-ui, sans-serif);
+  --workbench-font-code: var(--dsh-font-family-mono, 'JetBrains Mono', ui-monospace);
+  --workbench-font-ui-size: var(--dsh-content-font-size, 13px);
+  --workbench-font-code-size: var(--dsh-code-font-size, 12px);
+  --workbench-code-line-height: 1.6;
 }
-.tern-root[data-tern-font-ui='inter'] { --tern-font-ui: 'Inter', system-ui, sans-serif; }
-.tern-root[data-tern-font-ui='system'] { --tern-font-ui: system-ui, sans-serif; }
+.workbench-root[data-workbench-font-ui='inter'] { --workbench-font-ui: 'Inter', system-ui, sans-serif; }
+.workbench-root[data-workbench-font-ui='system'] { --workbench-font-ui: system-ui, sans-serif; }
 /* 自定义：设置值直接写进行内 style，绕过枚举 */
 ```
 
@@ -247,7 +247,7 @@ font.code.lineHeight  1.5 | 1.6 | 1.8
 ctx.effect(() => ctx.slots.inject('main', function* () {
   yield ctx.slots.register({
     name: 'main',
-    key: 'tern-workspace',
+    key: 'workbench',
     label: 'Workspace',           // 左侧栏面板行的标题（走 locale）
     locale: NS,
     store,                        // 面板级 snapshot store
@@ -257,17 +257,17 @@ ctx.effect(() => ctx.slots.inject('main', function* () {
 ```
 
 - 左侧栏会出现同名面板行（图标来自 `sidebar.panellist` slot，可选注册一个 glyph）。
-- `ctx.layout.selectPanel('tern-workspace')` 进入；`ctx.layout.selectPanel(null)` 回会话视图（会话 tab 的跳转语义）。
+- `ctx.layout.selectPanel('workbench')` 进入；`ctx.layout.selectPanel(null)` 回会话视图（会话 tab 的跳转语义）。
 - 面板必须按布局包约定处理 `--dsh-frame-top-clearance` 顶部留白（Desktop 的 caption / macOS 红绿灯）。
 
 ### 2.1b 与 dsh 默认页互切
 
 ```
 启动：const mode = config.startup ?? 'workspace'     // 'workspace' | 'last' | 'conversation'
-      if (mode === 'workspace' || (mode === 'last' && lastPanel() === 'tern-workspace'))
+      if (mode === 'workspace' || (mode === 'last' && lastPanel() === 'workbench'))
         layoutReady.then(() => enterWorkspace())
 
-进入：ctx.layout.selectPanel('tern-workspace')
+进入：ctx.layout.selectPanel('workbench')
       → 记住 dsh 左栏折叠态；若未折叠，ctx.layout.toggleSidebar() 收起
 离开：ctx.layout.selectPanel(null)        // 回会话视图
       → 恢复进入前的左栏折叠态
@@ -278,7 +278,7 @@ ctx.effect(() => ctx.slots.inject('main', function* () {
 
 ```js
 ctx.slots.entries('main')
-  .filter(e => e.options.key !== 'tern-workspace')
+  .filter(e => e.options.key !== 'workbench')
   .map(e => ({ key: e.options.key, label: resolveSlotLabel(e.options.label) }))
 // 点击 → ctx.layout.selectPanel(key)
 ```
@@ -340,7 +340,7 @@ interface WorkspaceLayout {
 
 ```js
 // 每个 tab 类型自注册，面板只负责壳
-ctx.reflect.provide('ternTabs', registry)  // 或内部模块直接 import
+ctx.reflect.provide('workbenchTabs', registry)  // 或内部模块直接 import
 registry.register({
   kind: 'git',
   icon: Component,
@@ -391,9 +391,9 @@ const Conversation = require('@deepseek-ai/dsh-client-ui-conversation')
 
 ## 3. 宿主 API 契约
 
-单一路由 `POST /dsh-tern-workspace/api`，请求体 `{ op, args }`，响应 `{ ok: true, ...} | { ok: false, code, message, details? }`。
+单一路由 `POST /dsh-workbench/api`，请求体 `{ op, args }`，响应 `{ ok: true, ...} | { ok: false, code, message, details? }`。
 
-- 必须要求 `x-dsh-plugin: dsh-tern-workspace` 头（CSRF 门），与官方/第三方插件一致。
+- 必须要求 `x-dsh-plugin: dsh-workbench` 头（CSRF 门），与官方/第三方插件一致。
 - 所有 `op` 入参中的路径必须解析后校验：文件读允许工作区外（与宿主 `workspaceFiles` 一致），但 **list / search / watch 必须限制在该会话工作区内**；笔记库路径必须限制在配置的 vault 内，拒绝 `..` 逃逸与符号链接穿越。
 
 | op | 入参 | 出参 | 归属 |
@@ -421,7 +421,7 @@ const Conversation = require('@deepseek-ai/dsh-client-ui-conversation')
 | 上游部分 | 处理 |
 |---|---|
 | 宿主半 `src/index.js` | 保留：前缀路由 `POST /dsh-ide-git/api/<method>`（32 方法：`summary/branches/log/commitDetail/diff/compare/stage/commit/checkout/branch*/tag*/stash*/fetch/pull/push/reset/revert/cherry-pick/commit-models/commit-efforts/version`）、argv-only `spawn('git', ...)`、同仓写操作串行队列、diff ≤400KB 截断、`engines.dsh` 兼容门槛。改为**被我们的宿主插件 `ctx.plugin(gitHost, config)` 挂载**，不再自带 bundle 行。 |
-| 客户端面板 `src/client.js` | 保留 UI（动作条 / 分支树 / 提交列表 + lane 图谱 / 提交详情 / 变更四分组 / 提交框 / 撤回浮窗 / ResizeObserver 自适应 columns\|stack），只改三处：① `window.__ModuleLoader__.load` 包装 → 变成我们 bundle 内的一个模块导出；② 注册目标从 `ctx.betterSidebar.registerTab(...)` 改为 `ternTabs.register({kind:'git', …})` + `views.register({id:'git'})`；③ 去掉「主对话区 Git 标签页」那条注册路径。 |
+| 客户端面板 `src/client.js` | 保留 UI（动作条 / 分支树 / 提交列表 + lane 图谱 / 提交详情 / 变更四分组 / 提交框 / 撤回浮窗 / ResizeObserver 自适应 columns\|stack），只改三处：① `window.__ModuleLoader__.load` 包装 → 变成我们 bundle 内的一个模块导出；② 注册目标从 `ctx.betterSidebar.registerTab(...)` 改为 `workbenchTabs.register({kind:'git', …})` + `views.register({id:'git'})`；③ 去掉「主对话区 Git 标签页」那条注册路径。 |
 | 依赖 | 去掉 `dsh-better-sidebar` peer；`@deepseek-ai/dsh-client-ui-primitives`（`DiffBlock`/`FileTypeIcon`）改为可选 require + 自带降级渲染（与上游同样的 try/catch 姿态）。 |
 | 配置 | 上游的 row Config（rail 顺序/显隐、commitModel、placement 开关）并入我们的插件配置；`conversationTab` / `immersive` 两个 placement 字段删除。 |
 | push / pull | 代码保留，UI 从动作条与分支右键里默认隐藏（D3）；`config.experimentalRemoteOps=false` 时才出现。宿主侧对应方法保持原样（自带 `confirm: true` 守卫）。 |
@@ -450,7 +450,7 @@ Git 操作
 
 ## 5. 兼容性与约束
 
-- `dsh.client.inject` 只声明真实需要的模块（布局、slots、locale、renderer、session、remotes），其余依赖自带打包；`external` 仅用于平台基线表内的模块。
+- `dsh.client.inject` 只声明真实需要的模块（布局、slots、locale、renderer、session、remotes），其余依赖自带打包；`exworkbenchal` 仅用于平台基线表内的模块。
 - 版本对齐：`peerDependencies` 写 `@deepseek-ai/cordis ~4.0.5` 与用到的 `0.2.1-rc.3` 包；`engines.dsh` 由安装期校验。
 - 主题：只用 `--dsw-alias-*` / `--dsh-*` 变量与 `data-ds-dark-theme`，提供浅/深两套自绘色（diff 的增删底色、graph 分支色）。
 - 国际化：所有用户可见文案进 `locale/{zh,en}.json`，通过 `ctx.locale.register(NS, dict)` + `bind(NS)` 取用。
@@ -466,12 +466,12 @@ Git 操作
 | 终端实现深度 | 优先复用宿主 terminal controller（Remote + xterm 渲染）；若 xterm 不可用则降级为「打开右侧栏终端」 | 自己起 PTY 会与宿主终端生命周期/限额重复（对应 S2） |
 | 内容检索位置 | 宿主侧 ripgrep，而非客户端递归 `read` | `workspaceFiles.list` 只有直接子项，客户端递归会打爆 Remote 往返 |
 | 布局存储 | 前端 localStorage 为主 | 面板几何本来就是 transient（宿主 layout README 明确），跨设备同步不在 v1 |
-| 单一 HTTP 路由多 op vs REST 多路由 | 两个前缀路由：`/dsh-tern-workspace/api`（自有 op）+ `/dsh-ide-git/api`（fork 保留） | 不改上游协议可降低 sync 成本；两者都做 CSRF 头与错误码统一处理 |
+| 单一 HTTP 路由多 op vs REST 多路由 | 两个前缀路由：`/dsh-workbench/api`（自有 op）+ `/dsh-ide-git/api`（fork 保留） | 不改上游协议可降低 sync 成本；两者都做 CSRF 头与错误码统一处理 |
 | push/pull | 代码保留、UI 默认隐藏 | 凭据/代理/冲突未验证，但删代码会让 upstream 同步变复杂（D3） |
 
 ## 7. 停用与回滚
 
-- 禁用：`dsh plugin --profile desktop remove dsh-tern-workspace` 或客户端插件页关闭该 bundle → patch 行消失，宿主启动不受影响（客户端半边懒加载，不注册任何全局副作用）。
+- 禁用：`dsh plugin --profile desktop remove dsh-workbench` 或客户端插件页关闭该 bundle → patch 行消失，宿主启动不受影响（客户端半边懒加载，不注册任何全局副作用）。
 - 数据回滚：笔记是独立 `.md` 文件，卸载不删库；布局在 localStorage，卸载后残留无害。
 - 破坏性 git 操作（checkout 覆盖本地改动）在 v1 一律先 `git status --porcelain` 检查并在 UI 里二次确认，不做自动 stash。
 
@@ -480,7 +480,7 @@ Git 操作
 | # | 实验 | 通过判据 | 失败时的退路 |
 |---|---|---|---|
 | S1 | 用最小 `main` 面板 + 一次 `workspaceFiles.read` 打通「安装 → 左侧栏出现入口 → 读文件上屏」 | Desktop 客户端里 30 分钟内可见 | 检查 `dsh.client.inject` 与 ModuleLoader id 是否匹配 |
-| S2 | 在客户端 bundle 内 `require('shiki')` / `require('@xterm/xterm')` | 能拿到导出并渲染 | 自带打包进 `client.js`，只留 react 为 external |
+| S2 | 在客户端 bundle 内 `require('shiki')` / `require('@xterm/xterm')` | 能拿到导出并渲染 | 自带打包进 `client.js`，只留 react 为 exworkbenchal |
 | S3 | 打开右侧栏终端并与其 controller 交互，确认可复用 | 能列出 shell 并附着 | 终端 tab 降级为「跳转右侧栏终端」 |
 | S4 | 本地目录安装进 desktop profile 并热更新 | 改代码后刷新生效 | 退化为重启客户端验证 |
 | S5 | `require('@deepseek-ai/dsh-client-ui-primitives')` 取 `DiffBlock` / `FileTypeIcon` | 拿到组件 | 自绘 diff 与文件图标（上游已用 try/catch 姿态，可直接照抄降级） |
