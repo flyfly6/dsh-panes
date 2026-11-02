@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { AlertCircle, RotateCw, WrapText } from 'lucide-react'
+import { highlightToHtml, isDark, languageOf } from '../highlight'
 import { Button } from '../ui/button'
 import { cn } from '../ui/cn'
 import type { Remote, Translate } from './types'
@@ -18,11 +19,20 @@ type State =
   | { status: 'ready'; text: string; count: number; eof: boolean }
   | { status: 'error'; message: string }
 
-/** Read-only source view: line gutter, wrap toggle, reload. Highlighting comes next. */
+/** Read-only source view: shiki highlighting, line gutter, wrap toggle, reload. */
 export function FileView({ path, sessionId, remote, t }: Props) {
   const [state, setState] = React.useState<State>({ status: 'loading' })
   const [wrap, setWrap] = React.useState(false)
   const [token, setToken] = React.useState(0)
+  const [dark, setDark] = React.useState(isDark)
+  const [html, setHtml] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    const root = document.documentElement
+    const observer = new MutationObserver(() => setDark(isDark()))
+    observer.observe(root, { attributes: true, attributeFilter: ['data-ds-dark-theme', 'class'] })
+    return () => observer.disconnect()
+  }, [])
 
   React.useEffect(() => {
     if (sessionId === undefined) {
@@ -31,6 +41,7 @@ export function FileView({ path, sessionId, remote, t }: Props) {
     }
     let live = true
     setState({ status: 'loading' })
+    setHtml(null)
     remote.workspaceFiles
       .read(sessionId, path, { offset: 1, limit: PAGE })
       .then((result) => {
@@ -47,6 +58,15 @@ export function FileView({ path, sessionId, remote, t }: Props) {
       live = false
     }
   }, [path, sessionId, remote, token, t])
+
+  React.useEffect(() => {
+    if (state.status !== 'ready') return
+    let live = true
+    void highlightToHtml(path, state.text).then((result) => live && setHtml(result))
+    return () => {
+      live = false
+    }
+  }, [path, state, dark])
 
   if (state.status === 'loading') {
     return <div className="grid h-full place-items-center text-xs text-muted-foreground">{t('file.loading')}</div>
@@ -67,19 +87,27 @@ export function FileView({ path, sessionId, remote, t }: Props) {
   return (
     <div className="flex h-full flex-col">
       <div className="wb-scroll flex-1 overflow-auto">
-        <div className="wb-code flex py-2">
-          <div className="select-none border-r border-border px-2 text-right text-[var(--faint-foreground)]" aria-hidden>
-            {rows.map((_, index) => (
-              <div key={index}>{index + 1}</div>
-            ))}
+        {html !== null ? (
+          <div
+            className={cn('wb-shiki', wrap && 'wb-code-wrap')}
+            /* shiki output is markup it generated from file text, not foreign HTML. */
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        ) : (
+          <div className="wb-code flex py-2">
+            <div className="select-none border-r border-border px-2 text-right text-muted-foreground" aria-hidden>
+              {rows.map((_, index) => (
+                <div key={index}>{index + 1}</div>
+              ))}
+            </div>
+            <div className={cn('flex-1 overflow-x-auto whitespace-pre px-3', wrap && 'wb-code-wrap')}>{state.text}</div>
           </div>
-          <div className={cn('flex-1 overflow-x-auto px-3 whitespace-pre', wrap && 'wb-code-wrap')}>{state.text}</div>
-        </div>
+        )}
       </div>
-      <div className="flex h-[26px] shrink-0 items-center gap-2 border-t border-border bg-card px-2 text-2xs text-muted-foreground">
-        <span>
-          {state.count} {state.eof ? '' : '…'}
-        </span>
+      <div className="flex h-status shrink-0 items-center gap-2 border-t border-border bg-card px-2 text-2xs text-muted-foreground">
+        <span>{languageOf(path) ?? 'plain'}</span>
+        <span>{state.count}</span>
+        {!state.eof && <span>…</span>}
         <span className="ml-auto" />
         <Button variant="ghost" size="sm" title="Wrap" onClick={() => setWrap((value) => !value)}>
           <WrapText className={cn('h-3 w-3', wrap && 'text-primary')} aria-hidden />

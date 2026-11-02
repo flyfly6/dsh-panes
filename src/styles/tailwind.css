@@ -58,3 +58,32 @@
 .workbench-root .wb-scroll {
   scrollbar-width: thin;
 }
+
+/* shiki: line numbers come from a CSS counter, so the HTML stays untouched. */
+.workbench-root .wb-shiki pre {
+  margin: 0;
+  padding: 8px 0;
+  overflow-x: auto;
+  background: transparent;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 22px;
+}
+
+.workbench-root .wb-shiki code {
+  counter-reset: line;
+  display: block;
+}
+
+.workbench-root .wb-shiki .line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  width: 3ch;
+  margin-right: 14px;
+  padding-right: 8px;
+  border-right: 1px solid var(--border);
+  text-align: right;
+  color: var(--faint-foreground);
+  user-select: none;
+}

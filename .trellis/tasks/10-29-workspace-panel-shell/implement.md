@@ -40,8 +40,8 @@
 
 ## 6. 代码视图
 
-- [x] 单页读取（≤800 行）、行号 gutter、面包屑、双击换行开关；分页追加 / 当前行 / 缩进参考线 / `Ctrl+G` / `Alt+Z` 键位未做。
-- [ ] shiki 初始化（按需语言 + 双主题随 `data-ds-dark-theme`）—— 按 S2 结论需打包进 client bundle。
+- [x] 单页读取（≤800 行）、行号 gutter（shiki 模式用 CSS counter）、面包屑、换行开关；分页追加 / 当前行 / 缩进参考线 / `Ctrl+G` / `Alt+Z` 键位未做。
+- [x] shiki 初始化：`shiki/core` + JS regex engine，16 种语言 + GitHub Light/Dark 双主题，随宿主明暗（`class="dark"` / `data-ds-dark-theme`）用 MutationObserver 重渲染；超长行（>5k）与未知扩展名回退纯文本。实测 `.ts` 7 种 token 色、`.json` 159 个 token span。bundle gzip 305KB。
 - [ ] `changes` 订阅：外部修改提示「已变化，点击重载」（重载按钮已在，订阅未接）。
 
 ## 7. Markdown 预览
