@@ -4,32 +4,32 @@
 
 ## 1. 面板壳 + 启动进入
 
-- [ ] `lib/client.js`：ModuleLoader 工厂 + locale 注册 + `ctx.slots.inject('main', …)` 注册 `main` 面板（key `workbench`）。
-- [ ] 骨架：`Sidebar | (TabBar / Breadcrumb / Content) / StatusBar`，处理 `--dsh-frame-top-clearance`。
+- [x] `lib/client.js`：ModuleLoader 工厂 + locale 注册 + `ctx.slots.inject('main', …)` 注册 `main` 面板（key `workbench`）+ `sidebar.panellist` 入口行。
+- [x] 骨架：`Sidebar | (TabBar / Breadcrumb / Content) / StatusBar`，处理 `--dsh-frame-top-clearance`。
 - [ ] 启动进入：`config.startup === 'workspace'`（默认）时 layout ready 后 `selectPanel('workbench')`，并收起 dsh 左栏（S10 结论决定是否可程序化）。
-- [ ] 返回：`selectPanel(null)` + 恢复左栏；`Esc` 仅在面板聚焦且无弹层时生效。
-- [ ] 验证：安装 → dsh 左栏出现入口 → 打开即进入 → 控制台无报错（S1）。
+- [x] 返回：`selectPanel(null)`；`Esc` 仅在面板聚焦且无弹层时生效（左栏恢复随上一项一起做）。
+- [x] 验证：安装 → dsh 左栏出现入口 → 打开即进入 → 控制台无报错（S1）。
 
 ## 2. 项目模型 + 侧栏
 
-- [ ] 读宿主 workspace 注册表 → 项目列表（名称/路径/tab 数/running）。
-- [ ] 侧栏 UI：头部（返回 / PROJECTS / 加项目 / 折叠）、过滤框、项目行、`Add project`、底部「应用」区（`ctx.slots.entries('main')` 动态渲染，S11）、用户/设置。
-- [ ] 拖拽调宽（200–320，3px 热区，双击复位）+ 折叠成 52px 图标条；宽度与折叠态持久化。
-- [ ] 切换项目：切换整套 tab 集合（先持久化旧项目状态）。
+- [x] 读宿主 workspace 注册表（`useWorkspaces(s => s.items)`）→ 项目列表（名称/路径/tab 数）；running 标记未做。
+- [x] 侧栏 UI：头部（返回 / PROJECTS / 折叠）、过滤框、项目行、底部「应用」区（`ctx.slots.entries('main')`，S11）；`Add project` 未接宿主目录选择器。
+- [x] 拖拽调宽（200–320，3px 热区，双击复位）+ 折叠成 52px 图标条；宽度与折叠态持久化（已实测刷新恢复）。
+- [x] 切换项目：切换整套 tab 集合（实测 A 项目 2 tab → 切 B 空 → 切回 A 恢复）。
 
 ## 3. tab 模型 + `+` 菜单
 
-- [ ] `tabs` store：`open/close/activate/rename/move/reopenLast`，按 `${projectId}:${kind}:${contentId}` 去重。
-- [ ] `workbenchTabs` 注册表 + `create` 契约（T2/T3 依赖）。
-- [ ] `+` 菜单：Session / Open file / Explorer / Terminal / Browser / Source Control / Note / New note / New project。
-- [ ] localStorage `schemaVersion: 2`（activeProjectId + projects 映射）；读回时丢弃未知 kind。
-- [ ] 快捷键：`Ctrl+Tab` / `Ctrl+W` / `Ctrl+Shift+T` / `Ctrl+B`，终端聚焦时让位。
+- [x] `tabs` store（`src/tabs.ts` 纯函数 + `test/tabs.test.mjs` 8 条）：`open/close/activate/rename/move/reopenLast`，按 `${projectId}:${kind}:${contentId}` 去重。
+- [x] `workbenchTabs` 注册表（`ctx.provide('workbenchTabs', registry)`，`register({kind, order, render})`）。
+- [x] `+` 菜单：Session / Open file / Explorer / Search / Terminal / Browser / Source Control / Note（New note / New project 待接）。
+- [x] localStorage `schemaVersion: 2`（activeProjectId + projects 映射）；读回时丢弃未知 kind、越界宽度。
+- [x] 快捷键：`Ctrl+Tab` / `Ctrl+W` / `Ctrl+Shift+T` / `Ctrl+B`（终端未接入，暂无让位逻辑）；`Ctrl+P` / `Ctrl+Shift+F` 未做。
 
 ## 4. Explorer tab
 
-- [ ] 树：懒加载 `workspaceFiles.list`、折叠状态本地保存、忽略目录可配置、文件类型图标。
+- [x] 树：懒加载 `workspaceFiles.list`（`remote.workspaceFiles` 客户端接口）；折叠状态仅内存、忽略目录与类型图标未做。
 - [ ] 右键菜单：打开 / 在树中定位 / 复制路径 / 在系统打开。
-- [ ] 单击打开 file tab（幂等）。
+- [x] 单击打开 file tab（幂等，实测连点两次仍是一个 tab）。
 
 ## 5. Search tab
 
@@ -40,9 +40,9 @@
 
 ## 6. 代码视图
 
-- [ ] 分页读取 + 追加、行号 gutter、当前行高亮、缩进参考线、面包屑、`Ctrl+G`、`Alt+Z`、长行降级。
-- [ ] shiki 初始化（按需语言 + 双主题随 `data-ds-dark-theme`）。
-- [ ] `changes` 订阅：外部修改提示「已变化，点击重载」。
+- [x] 单页读取（≤800 行）、行号 gutter、面包屑、双击换行开关；分页追加 / 当前行 / 缩进参考线 / `Ctrl+G` / `Alt+Z` 键位未做。
+- [ ] shiki 初始化（按需语言 + 双主题随 `data-ds-dark-theme`）—— 按 S2 结论需打包进 client bundle。
+- [ ] `changes` 订阅：外部修改提示「已变化，点击重载」（重载按钮已在，订阅未接）。
 
 ## 7. Markdown 预览
 
