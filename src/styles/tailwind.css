@@ -1,0 +1,60 @@
+/* Workbench design tokens + Tailwind layers.
+ *
+ * Colors map the shadcn semantic names onto the host's theme variables, so light
+ * and dark follow the host without a second stylesheet (§2.0d-1). Preflight is
+ * disabled in tailwind.config.cjs; the rules below are the only global ones.
+ *
+ * `.workbench-portal` repeats the tokens because Radix portals render into
+ * document.body, outside the panel subtree. */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.workbench-root,
+.workbench-portal {
+  --background: var(--dsw-alias-bg-base);
+  --sidebar-bg: var(--dsw-alias-bg-layer-2);
+  --card: var(--dsw-alias-bg-layer-2);
+  --foreground: var(--dsw-alias-text-primary);
+  --muted: var(--dsw-alias-bg-layer-3);
+  --muted-foreground: var(--dsw-alias-text-secondary);
+  --faint-foreground: var(--dsw-alias-text-tertiary, var(--dsw-alias-text-secondary));
+  --border: var(--dsw-alias-border-l2);
+  --accent: var(--dsw-alias-brand-primary);
+  --hover: var(--dsw-alias-bg-layer-3);
+  --radius: 6px;
+}
+
+.workbench-root {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.5;
+  padding-top: var(--dsh-frame-top-clearance, 0px);
+}
+
+.workbench-root *,
+.workbench-portal * {
+  box-sizing: border-box;
+}
+
+.workbench-root .wb-code {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 22px;
+}
+
+.workbench-root .wb-code-wrap {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.workbench-root .wb-scroll {
+  scrollbar-width: thin;
+}

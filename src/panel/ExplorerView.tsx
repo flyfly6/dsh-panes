@@ -1,0 +1,95 @@
+import * as React from 'react'
+import { ChevronDown, ChevronRight, File, Folder } from 'lucide-react'
+import { Button } from '../ui/button'
+import { cn } from '../ui/cn'
+import type { DirectoryEntry, Remote, Translate } from './types'
+
+interface Props {
+  root: string
+  sessionId?: string
+  remote: Remote
+  onOpen: (path: string, name: string) => void
+  t: Translate
+}
+
+type Branch = DirectoryEntry[] | 'loading' | 'error'
+
+/** Lazy directory tree over `workspaceFiles.list`; click a file to open a tab. */
+export function ExplorerView({ root, sessionId, remote, onOpen, t }: Props) {
+  const [branches, setBranches] = React.useState<Record<string, Branch>>({})
+
+  const load = React.useCallback(
+    (relative: string) => {
+      if (sessionId === undefined) return
+      setBranches((prev) => ({ ...prev, [relative]: 'loading' }))
+      remote.workspaceFiles
+        .list(sessionId, relative === '' ? '.' : relative)
+        .then((result) =>
+          setBranches((prev) => ({ ...prev, [relative]: result.ok ? result.value.entries : 'error' })),
+        )
+        .catch(() => setBranches((prev) => ({ ...prev, [relative]: 'error' })))
+    },
+    [remote, sessionId],
+  )
+
+  React.useEffect(() => {
+    load('')
+  }, [load])
+
+  const collapse = (path: string) =>
+    setBranches((prev) => {
+      const next = { ...prev }
+      delete next[path]
+      return next
+    })
+
+  const level = (relative: string, depth: number): React.ReactNode => {
+    const branch = branches[relative]
+    if (branch === undefined || branch === 'loading') {
+      return <div className="px-3 py-1 text-2xs text-muted-foreground">{t('explorer.loading')}</div>
+    }
+    if (branch === 'error') return <div className="px-3 py-1 text-2xs text-muted-foreground">{t('explorer.failed')}</div>
+    if (branch.length === 0) {
+      return <div className="px-3 py-1 text-2xs text-muted-foreground">{t('explorer.empty')}</div>
+    }
+    return branch.map((child) => {
+      const childPath = relative === '' ? child.name : `${relative}/${child.name}`
+      const isDir = child.type === 'directory'
+      const open = branches[childPath] !== undefined
+      return (
+        <React.Fragment key={childPath}>
+          <Button
+            variant="ghost"
+            className={cn('h-[22px] w-full justify-start gap-1 rounded-none px-1 text-xs font-normal')}
+            style={{ paddingLeft: 4 + depth * 12 }}
+            onClick={() => (isDir ? (open ? collapse(childPath) : load(childPath)) : onOpen(childPath, child.name))}
+          >
+            <span className="grid h-3 w-3 place-items-center text-muted-foreground">
+              {isDir ? (
+                open ? (
+                  <ChevronDown className="h-3 w-3" aria-hidden />
+                ) : (
+                  <ChevronRight className="h-3 w-3" aria-hidden />
+                )
+              ) : null}
+            </span>
+            {isDir ? (
+              <Folder className="h-3 w-3 text-muted-foreground" aria-hidden />
+            ) : (
+              <File className="h-3 w-3 text-muted-foreground" aria-hidden />
+            )}
+            <span className="truncate">{child.name}</span>
+          </Button>
+          {isDir && open ? level(childPath, depth + 1) : null}
+        </React.Fragment>
+      )
+    })
+  }
+
+  return (
+    <div className="py-1 text-xs">
+      <div className="truncate px-3 py-1 text-2xs text-muted-foreground">{root}</div>
+      {level('', 0)}
+    </div>
+  )
+}

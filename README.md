@@ -33,6 +33,9 @@ Uninstall: remove it from `dsh.profile.bundles` and run
 | Path | Role |
 |---|---|
 | `src/index.ts` | Host half: cordis plugin, `POST /dsh-workbench/api` route. |
+| `src/ui/` | shadcn primitives (button, input, dropdown-menu) + `cn()`. |
+| `src/panel/` | Panel shell, file view, explorer view, shared types. |
+| `src/styles/tailwind.css` | Design tokens (host theme vars) + Tailwind layers. |
 | `src/client.ts` | Browser half: registers the `main` panel + its `sidebar.panellist` launcher row; panel shell, tabs, file/explorer views. |
 | `src/tabs.ts` | Pure tab model: per-project tab sets, idempotent open, persisted layout. |
 | `cordis.patch.yml` | Bundle patch: one `insert` row naming this package. |
@@ -46,13 +49,22 @@ Host calls go through one same-origin route with `{ op, args }`; the client must
 send `x-dsh-plugin: dsh-workbench`, and the host answers only loopback or
 same-origin callers.
 
-## Develop
+## Toolchain
+
+Tailwind 3 + shadcn/ui (Radix primitives, `class-variance-authority`, `lucide-react`),
+all bundled into `lib/client.js` — only `react`, `react-dom` and `@deepseek-ai/*`
+stay external (host shared module table). Tailwind runs with **preflight off** and
+every component lives under `.workbench-root` / `.workbench-portal`.
+
+The browser half is compiled to **CJS** and wrapped into the client-modules factory
+form by `scripts/wrap-client.mjs`; it must not emit ESM imports, because the loader
+gives the bundle a `require`, never a module graph.
 
 ```bash
-pnpm build      # tsdown -> lib/
+pnpm build      # build:styles (Tailwind -> src/generated/styles.ts) + tsdown + wrap
 pnpm typecheck  # tsc --noEmit
-pnpm test       # build + node --test (host route + tab model)
-pnpm check      # typecheck + test
+pnpm test       # node --test (host route + tab model)
+pnpm check      # build + typecheck + test
 ```
 
 Rebuild and reload the page to pick up client changes; a bundle added to a

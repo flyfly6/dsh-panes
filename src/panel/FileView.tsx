@@ -1,0 +1,93 @@
+import * as React from 'react'
+import { AlertCircle, RotateCw, WrapText } from 'lucide-react'
+import { Button } from '../ui/button'
+import { cn } from '../ui/cn'
+import type { Remote, Translate } from './types'
+
+const PAGE = 800
+
+interface Props {
+  path: string
+  sessionId?: string
+  remote: Remote
+  t: Translate
+}
+
+type State =
+  | { status: 'loading' }
+  | { status: 'ready'; text: string; count: number; eof: boolean }
+  | { status: 'error'; message: string }
+
+/** Read-only source view: line gutter, wrap toggle, reload. Highlighting comes next. */
+export function FileView({ path, sessionId, remote, t }: Props) {
+  const [state, setState] = React.useState<State>({ status: 'loading' })
+  const [wrap, setWrap] = React.useState(false)
+  const [token, setToken] = React.useState(0)
+
+  React.useEffect(() => {
+    if (sessionId === undefined) {
+      setState({ status: 'error', message: t('file.failed') })
+      return
+    }
+    let live = true
+    setState({ status: 'loading' })
+    remote.workspaceFiles
+      .read(sessionId, path, { offset: 1, limit: PAGE })
+      .then((result) => {
+        if (!live) return
+        if (result.ok) {
+          setState({ status: 'ready', text: result.value.text, count: result.value.lines, eof: result.value.eof })
+        } else {
+          const binary = result.error.code.includes('not-text')
+          setState({ status: 'error', message: binary ? t('file.binary') : `${t('file.failed')}: ${result.error.code}` })
+        }
+      })
+      .catch((error: Error) => live && setState({ status: 'error', message: error.message }))
+    return () => {
+      live = false
+    }
+  }, [path, sessionId, remote, token, t])
+
+  if (state.status === 'loading') {
+    return <div className="grid h-full place-items-center text-xs text-muted-foreground">{t('file.loading')}</div>
+  }
+  if (state.status === 'error') {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
+        <AlertCircle className="h-4 w-4" aria-hidden />
+        <span>{state.message}</span>
+        <Button variant="outline" size="sm" onClick={() => setToken((value) => value + 1)}>
+          <RotateCw className="h-3 w-3" aria-hidden /> {t('file.reload')}
+        </Button>
+      </div>
+    )
+  }
+
+  const rows = state.text.split('\n')
+  return (
+    <div className="flex h-full flex-col">
+      <div className="wb-scroll flex-1 overflow-auto">
+        <div className="wb-code flex py-2">
+          <div className="select-none border-r border-border px-2 text-right text-[var(--faint-foreground)]" aria-hidden>
+            {rows.map((_, index) => (
+              <div key={index}>{index + 1}</div>
+            ))}
+          </div>
+          <div className={cn('flex-1 overflow-x-auto px-3 whitespace-pre', wrap && 'wb-code-wrap')}>{state.text}</div>
+        </div>
+      </div>
+      <div className="flex h-[26px] shrink-0 items-center gap-2 border-t border-border bg-card px-2 text-2xs text-muted-foreground">
+        <span>
+          {state.count} {state.eof ? '' : '…'}
+        </span>
+        <span className="ml-auto" />
+        <Button variant="ghost" size="sm" title="Wrap" onClick={() => setWrap((value) => !value)}>
+          <WrapText className={cn('h-3 w-3', wrap && 'text-primary')} aria-hidden />
+        </Button>
+        <Button variant="ghost" size="sm" title={t('file.reload')} onClick={() => setToken((value) => value + 1)}>
+          <RotateCw className="h-3 w-3" aria-hidden />
+        </Button>
+      </div>
+    </div>
+  )
+}

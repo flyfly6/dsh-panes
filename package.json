@@ -15,10 +15,12 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsdown",
+    "build:styles": "node scripts/build-styles.mjs",
+    "build:client": "tsdown && node scripts/wrap-client.mjs",
+    "build": "pnpm run build:styles && pnpm run build:client",
     "typecheck": "tsc --noEmit",
-    "test": "pnpm run build && node --test test/*.test.mjs",
-    "check": "pnpm run typecheck && pnpm run test"
+    "test": "node --test test/*.test.mjs",
+    "check": "pnpm run build && pnpm run typecheck && pnpm run test"
   },
   "dsh": {
     "manifestVersion": 1,
@@ -37,8 +39,17 @@
     "react": "^18.3.0"
   },
   "devDependencies": {
+    "@radix-ui/react-dropdown-menu": "^2.2.1",
+    "@radix-ui/react-separator": "^1.2.0",
+    "@radix-ui/react-tooltip": "^1.4.1",
     "@types/node": "^22.20.3",
     "@types/react": "^18.3.12",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.66.0",
+    "shiki": "^4.6.0",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^3.4.19",
     "tsdown": "^0.23.0",
     "typescript": "^5.9.3"
   },

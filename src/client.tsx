@@ -1,0 +1,112 @@
+/**
+ * dsh-workbench — browser half entry.
+ *
+ * The file is bundled as CJS and wrapped into the client-modules factory form by
+ * scripts/wrap-client.mjs, so it must export the cordis plugin (`name`, `inject`,
+ * `apply`) and never call `window.__ModuleLoader__` itself.
+ */
+import styles from './generated/styles'
+import { en, NS, zh } from './locale'
+import { createRegistry, WorkbenchPanel, type TabRegistry } from './panel/WorkbenchPanel'
+
+const PLUGIN_ID = 'dsh-workbench'
+const API = '/dsh-workbench/api'
+const PANEL_KEY = 'workbench'
+
+export const name = PLUGIN_ID
+export const inject = ['slots', 'layout', 'locale', 'workspaces', 'remote', 'remote.workspaceFiles'] as const
+
+/** Host ops used by the panel (search comes with §5). */
+export async function call(op: string, args: Record<string, unknown> = {}): Promise<any> {
+  const response = await fetch(API, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-dsh-plugin': PLUGIN_ID },
+    body: JSON.stringify({ op, args }),
+  })
+  const body = await response.json().catch(() => null)
+  if (!response.ok || body?.ok !== true) throw new Error(body?.message ?? `HTTP ${response.status}`)
+  return body.data
+}
+
+function installStyles(): () => void {
+  const style = document.createElement('style')
+  style.dataset.pluginCss = PLUGIN_ID
+  style.textContent = styles
+  document.head.append(style)
+  return () => style.remove()
+}
+
+/** Sidebar glyph for the launcher row. */
+function PanelIcon({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.2}
+      aria-hidden
+    >
+      <rect x={1.5} y={2.5} width={13} height={11} rx={2} />
+      <line x1={6} y1={2.5} x2={6} y2={13.5} />
+      <line x1={6} y1={7} x2={14.5} y2={7} />
+    </svg>
+  )
+}
+
+export function apply(ctx: any): void {
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-workbench: locale')
+  const t = ctx.locale.bind(NS)
+  const close = () => ctx.layout.selectPanel(null)
+  ctx.effect(() => installStyles(), 'dsh-workbench: styles')
+
+  // T2/T3 add their tab types through this service.
+  const registry: TabRegistry = createRegistry()
+  try {
+    ctx.provide('workbenchTabs', registry)
+  } catch {
+    /* host without provide(): built-in kinds still work */
+  }
+
+  const apps = () => {
+    try {
+      return (ctx.slots.entries('main') ?? [])
+        .filter((entry: any) => typeof entry?.options?.key === 'string' && entry.options.key !== PANEL_KEY)
+        .map((entry: any) => ({ key: String(entry.options.key), label: String(entry.options.label ?? entry.options.key) }))
+    } catch {
+      return []
+    }
+  }
+
+  ctx.effect(
+    () =>
+      ctx.slots.inject('main', () =>
+        ctx.slots.register(
+          {
+            name: 'main',
+            key: PANEL_KEY,
+            locale: NS,
+            inject: () => ({
+              t,
+              close,
+              remote: ctx.remote,
+              apps: apps(),
+              openPanel: (key: string) => ctx.layout.selectPanel(key),
+              registry,
+            }),
+          },
+          WorkbenchPanel,
+        ),
+      ),
+    'dsh-workbench: workbench panel',
+  )
+
+  ctx.effect(
+    () =>
+      ctx.slots.inject('sidebar.panellist', () =>
+        ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_KEY, order: 40, label: () => t('panel.title') }, PanelIcon),
+      ),
+    'dsh-workbench: sidebar launcher',
+  )
+}

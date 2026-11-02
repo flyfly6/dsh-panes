@@ -43,6 +43,21 @@ ctx.slots.inject('sidebar.panellist', () => ctx.slots.register(
 - `ctx.layout.selectPanel(key)` enters; `ctx.layout.selectPanel(null)` returns to
   the conversation.
 
+## The browser bundle has no module graph
+
+The loader hands the bundle `factory(require)` — there is no ESM resolution inside
+it. A source file that says `import * as React from 'react'` must end up as
+`require('react')`, which means:
+
+- build the browser half as **CJS**, then wrap it once into
+  `window.__ModuleLoader__.load({ id, factory: (require) => { … return module.exports } })`;
+- keep only the shared-table packages external (`react`, `react-dom`,
+  `react/jsx-runtime`, `@deepseek-ai/*`); bundle everything else (Radix, lucide,
+  shiki, clsx…);
+- never call `window.__ModuleLoader__` from the source itself — the wrapper owns it.
+
+Two builds, one package: host half ESM for Node, browser half CJS + wrapper.
+
 ## Shared module table
 
 Client bundles resolve `require` against the host's frozen table. Confirmed
@@ -82,3 +97,5 @@ Rebuild + page reload picks up client changes for an already-composed bundle; a
 | No sidebar row, no console error | Forgot the `sidebar.panellist` registration. |
 | `404` on `/plugins/<pkg>/client.js` | Expected: served through combo URLs; only the boot graph path works. |
 | Client half silently absent | `exports['./package.json']` or `dsh.client` missing. |
+| `import failed: cannot resolve ...` on boot | The client bundle emitted an ESM import (or a relative chunk) instead of a factory body. |
+| Radix popper renders unstyled/wrong colors | Tokens live on `.workbench-root`; the portal needs them too (`.workbench-portal`). |
