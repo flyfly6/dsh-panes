@@ -126,7 +126,7 @@ export function createHandler(readConfig: () => PluginConfig) {
       const failure = error as ApiError
       sendJson(res, failure.status ?? 500, {
         ok: false,
-        code: failure.code ?? 'inworkbenchal',
+        code: failure.code ?? 'internal',
         message: failure.message ?? String(error),
       })
     }

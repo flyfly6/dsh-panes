@@ -20,7 +20,7 @@ PowerShell 读法见本任务历史命令（`[System.IO.File]::OpenRead` + `BitC
 
 ## 2. 插件契约（结论）
 
-- 包结构：`main: lib/index.js`（宿主半边）+ `exports["./client"]: lib/client.js`（浏览器半边）+ `dsh.bundle.patch` → `cordis.patch.yml` 的 `- insert:` 行 + `dsh.client{platform:'web', inject:[...], exworkbenchal?:[...]}`。
+- 包结构：`main: lib/index.js`（宿主半边）+ `exports["./client"]: lib/client.js`（浏览器半边）+ `dsh.bundle.patch` → `cordis.patch.yml` 的 `- insert:` 行 + `dsh.client{platform:'web', inject:[...], external?:[...]}`。
 - 客户端 bundle 形态：`const factory = (require) => { ...; return module.exports }; window.__ModuleLoader__.load({ id, factory })`，id 要与 Loader entry 的 id 一致（官方包用自己的包名）。
 - 运行时 API 名：`ctx.slots`（`register/inject/entries/subscribe/getVersion`）、`ctx.layout`（`selectPanel/panelInfo/openRightbar`）、`ctx.locale`、`ctx.remote`、`ctx.reflect.provide`、`ctx.effect`、`ctx.get('slots')`（第三方写法）。
 - **全屏主面板注册**（官方 `ui-plugin-manager` 的写法，`lib/client.js` 第 ~4411 行）：
@@ -73,7 +73,7 @@ ctx.layout.selectPanel(PANEL_ID)
 
 ## 7. 上游参考实现：dsh-ide-git（fork 来源）
 
-`https://github.com/KannaKuron/dsh-ide-git`，MIT，抓取时版本 **v0.21.1**（package.json 与 dsh.plugin.json 一致，id `dsh-exworkbenchal/dsh-ide-git`）。
+`https://github.com/KannaKuron/dsh-ide-git`，MIT，抓取时版本 **v0.21.1**（package.json 与 dsh.plugin.json 一致，id `dsh-external/dsh-ide-git`）。
 
 - 形态：`main: src/index.js`（宿主半）+ `exports['./client']: src/client.js`（客户端半，**无构建单文件**）+ `cordis.patch.yml`（`- insert: [{ id: ide-git, name: 'dsh-ide-git' }]`）+ `exports['./package.json']`（缺了客户端进不了 boot graph，上游 issue #2）。
 - 宿主半：前缀路由 `POST /dsh-ide-git/api/<method>`，方法表约 32 个（`summary/branches/log/commitDetail/diff/compare/stage/commit/checkout/branch*/tag*/stash*/fetch/pull/push/reset/revert/cherry-pick/commit-models/commit-efforts/version` …）；全部 `spawn('git', argv)`，无 shell 字符串；同仓写操作串行；diff 输出上限 400KB；含「AI 生成提交信息」特性（`ctx.inject(['llm','sessions'])`，模型与 effort 走 row Config）。

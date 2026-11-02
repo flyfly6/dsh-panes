@@ -4,14 +4,18 @@ Tabbed workspace workbench for DeepSeek Harness: one full-screen `main` panel
 with a project sidebar and per-project tabs (code view, search, Markdown
 preview, terminal, browser, session, Git, notes).
 
-**Status: scaffold.** The panel shell, host API route and locale wiring exist;
-the tab workspace lands in T1, the Git client in T2, notes in T3.
+**Status: T1 in progress.** The panel shell, project sidebar, per-project tabs,
+file view and explorer exist; highlighting, search, terminal/browser/session tabs
+land next, then the Git client (T2) and notes (T3).
+
+The repository root *is* the package: `package.json`, `src/`, `test/` and
+`cordis.patch.yml` sit here beside `designs/` and `.trellis/`.
 
 ## Install (local directory, v1 path)
 
 ```bash
-# 1. build
-cd dsh-workbench && pnpm install && pnpm build
+# 1. build (from the repository root)
+pnpm install && pnpm build
 
 # 2. install into a profile as a linked dependency
 dsh plugin --profile desktop add "$(pwd)"
@@ -29,7 +33,8 @@ Uninstall: remove it from `dsh.profile.bundles` and run
 | Path | Role |
 |---|---|
 | `src/index.ts` | Host half: cordis plugin, `POST /dsh-workbench/api` route. |
-| `src/client.ts` | Browser half: registers the `main` panel + its `sidebar.panellist` launcher row. |
+| `src/client.ts` | Browser half: registers the `main` panel + its `sidebar.panellist` launcher row; panel shell, tabs, file/explorer views. |
+| `src/tabs.ts` | Pure tab model: per-project tab sets, idempotent open, persisted layout. |
 | `cordis.patch.yml` | Bundle patch: one `insert` row naming this package. |
 | `lib/` | Build output (gitignored). |
 
@@ -46,7 +51,8 @@ same-origin callers.
 ```bash
 pnpm build      # tsdown -> lib/
 pnpm typecheck  # tsc --noEmit
-pnpm test       # build + node --test (host route: trust fence, ops, errors)
+pnpm test       # build + node --test (host route + tab model)
+pnpm check      # typecheck + test
 ```
 
 Rebuild and reload the page to pick up client changes; a bundle added to a

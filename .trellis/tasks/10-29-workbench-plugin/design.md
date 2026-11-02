@@ -4,22 +4,23 @@
 
 ## 1. 形态与边界
 
-单个 npm 包 `dsh-workbench`（可发布结构，v1 用本地目录安装）：
+单个 npm 包 `dsh-workbench`（可发布结构，v1 用本地目录安装）。**仓库根 = 包根**：不再套一层同名目录，包文件与 `designs/`、`.trellis/` 平级。
 
 ```
-dsh-workbench/
+（仓库根）/
 ├─ package.json          # main: lib/index.js, exports["./client"]: lib/client.js,
-│                        # dsh.bundle.patch, dsh.client{platform,inject,exworkbenchal}
+│                        # dsh.bundle.patch, dsh.client{platform,inject,external}
 ├─ cordis.patch.yml      # - insert: [{ id: workbench, name: dsh-workbench }]
-├─ lib/
-│  ├─ index.js           # 宿主半边入口：组合 search / notes / 挂载 fork 进来的 git 半
-│  ├─ client.js          # 浏览器半边入口：VSCode 式 shell + 各 tab 类型
-│  └─ types/*.d.ts
+├─ lib/                  # 构建产物（gitignored）
+│  ├─ index.js           # 宿主半边：路由 + search / notes / 挂载 fork 进来的 git 半
+│  └─ client.js          # 浏览器半边：面板壳 + 各 tab 类型（tabs.ts 内联进 bundle）
 ├─ src/
-│  ├─ host/{search.js,notes.js,config.js}
-│  ├─ client/{shell/,views/{explorer,search,git,notes}/,editors/,tabs.js,views.js}
+│  ├─ index.ts           # 宿主半入口
+│  ├─ client.ts          # 浏览器半入口（面板 / 侧栏 / tab 条 / 文件与树视图）
+│  ├─ tabs.ts            # 纯 tab 模型（可被 node --test 直接 import）
 │  └─ git/               # ★ fork 自 dsh-ide-git（MIT）：host.js + panel.js
-├─ locale/{zh,en}.json
+├─ test/                 # node --test：宿主路由 + tab 模型
+├─ locale/               # zh/en 字典（暂内联在 client.ts，拆文件时再建）
 ├─ NOTICE.md             # 第三方来源与 MIT 署名
 └─ README.md
 ```
@@ -450,7 +451,7 @@ Git 操作
 
 ## 5. 兼容性与约束
 
-- `dsh.client.inject` 只声明真实需要的模块（布局、slots、locale、renderer、session、remotes），其余依赖自带打包；`exworkbenchal` 仅用于平台基线表内的模块。
+- `dsh.client.inject` 只声明真实需要的模块（布局、slots、locale、renderer、session、remotes），其余依赖自带打包；`external` 仅用于平台基线表内的模块。
 - 版本对齐：`peerDependencies` 写 `@deepseek-ai/cordis ~4.0.5` 与用到的 `0.2.1-rc.3` 包；`engines.dsh` 由安装期校验。
 - 主题：只用 `--dsw-alias-*` / `--dsh-*` 变量与 `data-ds-dark-theme`，提供浅/深两套自绘色（diff 的增删底色、graph 分支色）。
 - 国际化：所有用户可见文案进 `locale/{zh,en}.json`，通过 `ctx.locale.register(NS, dict)` + `bind(NS)` 取用。
@@ -480,7 +481,7 @@ Git 操作
 | # | 实验 | 通过判据 | 失败时的退路 |
 |---|---|---|---|
 | S1 | 用最小 `main` 面板 + 一次 `workspaceFiles.read` 打通「安装 → 左侧栏出现入口 → 读文件上屏」 | Desktop 客户端里 30 分钟内可见 | 检查 `dsh.client.inject` 与 ModuleLoader id 是否匹配 |
-| S2 | 在客户端 bundle 内 `require('shiki')` / `require('@xterm/xterm')` | 能拿到导出并渲染 | 自带打包进 `client.js`，只留 react 为 exworkbenchal |
+| S2 | 在客户端 bundle 内 `require('shiki')` / `require('@xterm/xterm')` | 能拿到导出并渲染 | 自带打包进 `client.js`，只留 react 为 external |
 | S3 | 打开右侧栏终端并与其 controller 交互，确认可复用 | 能列出 shell 并附着 | 终端 tab 降级为「跳转右侧栏终端」 |
 | S4 | 本地目录安装进 desktop profile 并热更新 | 改代码后刷新生效 | 退化为重启客户端验证 |
 | S5 | `require('@deepseek-ai/dsh-client-ui-primitives')` 取 `DiffBlock` / `FileTypeIcon` | 拿到组件 | 自绘 diff 与文件图标（上游已用 try/catch 姿态，可直接照抄降级） |

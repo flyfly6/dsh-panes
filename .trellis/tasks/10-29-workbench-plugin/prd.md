@@ -10,7 +10,7 @@
 
 取证材料在 `research/dsh-asar/`（从本机 `resources/app.asar` 中 dsh `0.2.1-rc.3` 提取的官方包 README / package.json / client bundle 片段），结论：
 
-- **插件 = cordis 包的宿主半边 + 浏览器半边**。宿主半边 `lib/index.js`；浏览器半边 `lib/client.js` 由 `package.json` 的 `dsh.client`（`platform: web`、`inject`、可选 `exworkbenchal`）声明，经 `dsh-client-modules` 组进 boot graph 并用 `window.__ModuleLoader__.load({ id, factory })` 注册；`dsh.bundle.patch` 指向 `cordis.patch.yml` 的 `- insert:` 行，`dsh plugin --profile <p> add <spec>` 即可安装（支持本地绝对路径）。
+- **插件 = cordis 包的宿主半边 + 浏览器半边**。宿主半边 `lib/index.js`；浏览器半边 `lib/client.js` 由 `package.json` 的 `dsh.client`（`platform: web`、`inject`、可选 `external`）声明，经 `dsh-client-modules` 组进 boot graph 并用 `window.__ModuleLoader__.load({ id, factory })` 注册；`dsh.bundle.patch` 指向 `cordis.patch.yml` 的 `- insert:` 行，`dsh plugin --profile <p> add <spec>` 即可安装（支持本地绝对路径）。
 - **可以注册全屏主面板**：`ctx.slots.inject('main', function* () { yield ctx.slots.register({ name: 'main', key, label, locale, store, children }, Component) })`，`ctx.layout.selectPanel(key)` 切换，`selectPanel(null)` 回会话；注册的 `main` 面板会自动出现在左侧栏的面板列表里（每行图标来自 `sidebar.panellist` slot）。官方 Plugins 页就是这样挂的。
 - **宿主已提供数据能力**：`remote.workspaceFiles` 的 `read`（按行分页、带 version/eof）、`readBytes`、`stat`、`list`（仅目录直接子项）、`changes`（文件/目录 watch 流）；`/api/file` 取绝对路径文件；`dsh-api-terminal-controller` 管用户终端；`dsh-client-ui-sidebar-browser` 已实现 iframe/webview 两类浏览器承载；`dsh-subprocess` 可起子进程；`dsh-storage-json`/`dsh-storage-domain` 可持久化；宿主插件可注册 HTTP 路由（官方与第三方实例都用 `/dsh-<name>/api` + `x-dsh-plugin` 头做 CSRF 门）。
 - **已内置但形态受限的能力**：右侧栏本身是带 tab 的 dock，已有 Files / Document Preview（Markdown、代码、图片、PDF、Office、HTML）/ Terminal / Browser 四种 tab 类型；这些 tab 绑定在 `sidebarRightTabs` 与 per-session dock 上，宽 264–420px，**不是**可自由组织的整屏工作台，也**不能**把会话放进去。
