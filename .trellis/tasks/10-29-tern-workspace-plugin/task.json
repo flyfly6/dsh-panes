@@ -1,0 +1,30 @@
+{
+  "id": "tern-workspace-plugin",
+  "name": "tern-workspace-plugin",
+  "title": "Tern-like Workspace Plugin",
+  "description": "DSH plugin delivering a Tern-style tabbed workspace: code viewing/search with syntax highlighting, markdown preview, tabbed file/terminal/session/browser panes, git client with graph, and global Notion-like markdown notes.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "flyfly6",
+  "assignee": "flyfly6",
+  "createdAt": "2026-10-29",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-29-workspace-panel-shell",
+    "10-29-git-client",
+    "10-29-global-notes"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

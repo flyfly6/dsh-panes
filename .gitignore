@@ -1,0 +1,10 @@
+node_modules/
+.pnpm-store/
+dist/
+lib/
+*.log
+.DS_Store
+Thumbs.db
+
+# 第三方压缩代码副本（体积大且非本仓库产物）
+.trellis/tasks/*/research/dsh-asar/*__client.js
