@@ -4,19 +4,29 @@
  * and knows nothing about editors.
  */
 const DIRTY = new Map<string, boolean>()
-const listeners = new Set<() => void>()
+const STATUS = new Map<string, string>()
+const statusListeners = new Set<() => void>()
 
 export function setNoteDirty(path: string, dirty: boolean): void {
   if (dirty) DIRTY.set(path, true)
   else DIRTY.delete(path)
-  for (const listener of listeners) listener()
 }
 
 export function isNoteDirty(path: string): boolean {
   return DIRTY.get(path) === true
 }
 
-export function subscribeNoteDirty(listener: () => void): () => void {
-  listeners.add(listener)
-  return () => void listeners.delete(listener)
+/** `saved` | `dirty` | `saving` | `conflict` — shown in the tab's breadcrumb. */
+export function setNoteStatus(path: string, status: string): void {
+  STATUS.set(path, status)
+  for (const listener of statusListeners) listener()
+}
+
+export function noteStatusOf(path: string): string {
+  return STATUS.get(path) ?? ''
+}
+
+export function subscribeNoteStatus(listener: () => void): () => void {
+  statusListeners.add(listener)
+  return () => void statusListeners.delete(listener)
 }

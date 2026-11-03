@@ -55,6 +55,12 @@ export async function resolveImages(
   readBytes: ((path: string) => Promise<Uint8Array | null>) | undefined,
 ): Promise<void> {
   if (readBytes === undefined) return
+  /* One object URL per image, revoked when this container resolves again: an
+     image blob lives as long as the document otherwise (tab switches leak). */
+  const previous = (container as unknown as { __wbBlobUrls?: string[] }).__wbBlobUrls ?? []
+  for (const url of previous) URL.revokeObjectURL(url)
+  const created: string[] = []
+  ;(container as unknown as { __wbBlobUrls?: string[] }).__wbBlobUrls = created
   const images = [...container.querySelectorAll('img')]
   await Promise.all(
     images.map(async (image) => {
@@ -68,7 +74,9 @@ export async function resolveImages(
       const copy = new Uint8Array(bytes.byteLength)
       copy.set(bytes)
       const type = source.toLowerCase().endsWith('.png') ? 'image/png' : source.toLowerCase().match(/\.jpe?g$/) ? 'image/jpeg' : 'application/octet-stream'
-      image.src = URL.createObjectURL(new Blob([copy], { type }))
+      const blobUrl = URL.createObjectURL(new Blob([copy], { type }))
+      created.push(blobUrl)
+      image.src = blobUrl
     }),
   )
 }

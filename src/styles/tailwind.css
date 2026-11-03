@@ -11,19 +11,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens (design §2.0b's palette). The host exposes --dsw-alias-* too,
+ * but the design fixes exact values for this panel, so the workbench carries its
+ * own set and only borrows the host's dark-mode attribute. */
 .workbench-root,
 .workbench-portal {
-  --background: var(--dsw-alias-bg-base);
-  --sidebar-bg: var(--dsw-alias-bg-layer-2);
-  --card: var(--dsw-alias-bg-layer-2);
-  --foreground: var(--dsw-alias-text-primary);
-  --muted: var(--dsw-alias-bg-layer-3);
-  --muted-foreground: var(--dsw-alias-text-secondary);
-  --faint-foreground: var(--dsw-alias-text-tertiary, var(--dsw-alias-text-secondary));
-  --border: var(--dsw-alias-border-l2);
-  --accent: var(--dsw-alias-brand-primary);
-  --hover: var(--dsw-alias-bg-layer-3);
+  --panel: #F3F4F6;
+  --background: #FFFFFF;
+  --sidebar-bg: #FAFAFB;
+  --tabstrip-bg: #EFF1F4;
+  --card: #FAFAFB;
+  --foreground: #1B1F26;
+  --muted: #E7EBF3;
+  --muted-foreground: #5A616E;
+  --faint-foreground: #8B919C;
+  --border: #E3E5EA;
+  --border-strong: #CDD1D9;
+  --accent: #3B6FF5;
+  --hover: #ECEEF2;
   --radius: 6px;
+  --wb-font-ui: var(--dsh-font-family-sans, 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif);
+  --wb-font-code: var(--dsh-font-family-mono, 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace);
+  --wb-font-ui-size: 12px;
+  --wb-font-code-size: 12px;
+  --wb-code-line-height: 22px;
+}
+
+body[data-ds-dark-theme] .workbench-root,
+body[data-ds-dark-theme] .workbench-portal {
+  --panel: #15161A;
+  --background: #1C1D22;
+  --sidebar-bg: #191A1F;
+  --tabstrip-bg: #101115;
+  --card: #191A1F;
+  --foreground: #E7E8EC;
+  --muted: #2E3138;
+  --muted-foreground: #A0A3AC;
+  --faint-foreground: #6C7079;
+  --border: #2A2C33;
+  --border-strong: #3A3D46;
+  --accent: #5B8CFF;
+  --hover: #26282F;
 }
 
 .workbench-root {
@@ -32,11 +60,17 @@
   width: 100%;
   overflow: hidden;
   box-sizing: border-box;
-  background: var(--background);
+  background: var(--panel);
   color: var(--foreground);
-  font-size: 13px;
+  font-family: var(--wb-font-ui);
+  font-size: var(--wb-font-ui-size);
   line-height: 1.5;
   padding-top: var(--dsh-frame-top-clearance, 0px);
+}
+
+.workbench-portal {
+  font-family: var(--wb-font-ui);
+  font-size: var(--wb-font-ui-size);
 }
 
 .workbench-root *,
@@ -44,10 +78,28 @@
   box-sizing: border-box;
 }
 
+:where(.workbench-root, .workbench-portal) :where(button, input, textarea, select) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+:where(.workbench-root, .workbench-portal) :where(button) {
+  cursor: pointer;
+  text-align: inherit;
+}
+
+.workbench-root .wb-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.workbench-root .wb-scroll::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+.workbench-root .wb-scroll::-webkit-scrollbar-track { background: transparent; }
+
 .workbench-root .wb-code {
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-  line-height: 22px;
+  font-family: var(--wb-font-code);
+  font-size: var(--wb-font-code-size);
+  line-height: var(--wb-code-line-height);
 }
 
 .workbench-root .wb-code-wrap {
@@ -55,9 +107,38 @@
   word-break: break-word;
 }
 
-.workbench-root .wb-scroll {
-  scrollbar-width: thin;
+/* The plain (unhighlighted) source view: one flex row per line, so a hover or a
+   revealed line can be a full-width band like the design's current line. */
+.workbench-root .wb-src-line {
+  display: flex;
+  min-height: var(--wb-code-line-height);
+  padding-right: 12px;
 }
+.workbench-root .wb-src-num {
+  flex: none;
+  width: 46px;
+  padding-right: 10px;
+  text-align: right;
+  color: var(--faint-foreground);
+  user-select: none;
+}
+.workbench-root .wb-src-text {
+  flex: 1 1 auto;
+  white-space: pre;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  color: var(--foreground);
+}
+
+/* Tinted surfaces. Opacity modifiers on a `var()` colour do not compile to valid
+   CSS, so these three tones are spelled out once here. */
+.workbench-root .wb-proj-icon { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.workbench-root .wb-badge { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.workbench-root .wb-mark { background: #FFF3C4; }
+body[data-ds-dark-theme] .workbench-root .wb-mark { background: #4A3F1E; }
+.workbench-root .wb-hit-active { border-left-color: #D6A84A; background: color-mix(in srgb, #FFF3C4 55%, transparent); }
+body[data-ds-dark-theme] .workbench-root .wb-hit-active { background: color-mix(in srgb, #D6A84A 22%, transparent); }
+.workbench-root .wb-resize:hover { background: color-mix(in srgb, var(--accent) 50%, transparent); }
 
 /* shiki: line numbers come from a CSS counter, so the HTML stays untouched. */
 .workbench-root .wb-shiki pre {
@@ -65,9 +146,9 @@
   padding: 8px 0;
   overflow-x: auto;
   background: transparent;
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-  line-height: 22px;
+  font-family: var(--wb-font-code);
+  font-size: var(--wb-font-code-size);
+  line-height: var(--wb-code-line-height);
 }
 
 .workbench-root .wb-shiki code {
@@ -88,8 +169,20 @@
   user-select: none;
 }
 
+/* A revealed line (search hit / Ctrl+G): the design's yellow band with its
+   3px left bar. The band has to survive shiki's inline spans, so it is painted
+   on the line box itself. */
 .workbench-root .wb-line-active {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: color-mix(in srgb, #FFF3C4 55%, transparent);
+  box-shadow: inset 3px 0 0 0 #D6A84A;
+}
+body[data-ds-dark-theme] .workbench-root .wb-line-active {
+  background: color-mix(in srgb, #D6A84A 22%, transparent);
+}
+/* The line under the pointer: the design's current-line band. */
+.workbench-root .wb-line-hover,
+.workbench-root .wb-src-line:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 /* Markdown preview (no typography plugin: these are the only elements we render). */
@@ -121,13 +214,36 @@
 .workbench-root .wb-note-bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 11px;
   background: color-mix(in srgb, var(--accent) 10%, transparent); border-bottom: 1px solid var(--border); }
 .workbench-root .wb-note-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
-.workbench-root .wb-note-page { max-width: 760px; margin: 0 auto; padding: 28px 32px 120px; }
+.workbench-root .wb-note-page { max-width: 720px; margin: 0 auto; padding: 26px 32px 120px; }
 .workbench-root .wb-note-title { display: block; width: 100%; margin: 0 0 14px; padding: 0; border: 0; outline: none;
   background: transparent; color: var(--foreground); font-size: 32px; font-weight: 700; line-height: 1.25; }
 .workbench-root .wb-note-title::placeholder { color: var(--faint-foreground); }
 .workbench-root .wb-note-status { display: flex; align-items: center; gap: 12px; height: 26px; flex: none;
   padding: 0 12px; border-top: 1px solid var(--border); background: var(--card); font-size: 10px; color: var(--muted-foreground); }
-/* BlockNote owns its own typography; only the surface is ours. */
-.workbench-root .bn-container { background: transparent; }
+/* BlockNote owns its own typography; only the surface is ours. The editor paints
+   a rounded #1f1f1f slab by default — the design's note column has no slab. */
+.workbench-root .bn-container,
+.workbench-root .bn-editor { background: transparent; border-radius: 0; }
 .workbench-root .bn-editor { padding-inline: 0; }
-.workbench-root .bn-editor .bn-block-content { font-size: 13.5px; }
+.workbench-root .bn-editor .bn-block-content { font-size: 14px; line-height: 1.65; }
+.workbench-root .bn-block-content[data-content-type='checkListItem'] input { accent-color: var(--accent); }
+
+/* ---- notes meta row (design P4: tags + "最后编辑 …") -------------------- */
+.workbench-root .wb-note-meta { display: flex; align-items: center; gap: 6px; margin: -6px 0 18px; font-size: 11px; color: var(--muted-foreground); }
+.workbench-root .wb-note-tag { padding: 2px 8px; border-radius: 4px; background: var(--muted); color: var(--muted-foreground); }
+.workbench-root .wb-note-edited { margin-left: auto; color: var(--faint-foreground); font-size: 11px; }
+
+/* BlockNote paints code blocks near-black in every theme; the design keeps them
+   a quiet surface in light mode (P4) and dark in dark mode. */
+.workbench-root .bn-block-content[data-content-type='codeBlock'] {
+  background: var(--muted);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+body[data-ds-dark-theme] .workbench-root .bn-block-content[data-content-type='codeBlock'] {
+  background: #161616;
+  color: #E7E8EC;
+  border-color: #2A2C33;
+}
+.workbench-root .bn-block-content[data-content-type='codeBlock'] > pre { padding: 14px 16px; }

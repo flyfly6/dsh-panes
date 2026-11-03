@@ -1,11 +1,16 @@
 import * as React from 'react'
 import { AlertCircle, RotateCw, WrapText } from 'lucide-react'
-import { highlightToHtml, isDark, languageOf } from '../highlight'
+import { highlightToHtml, isDark, languageLabel, languageOf } from '../highlight'
 import { Button } from '../ui/button'
 import { cn } from '../ui/cn'
 import type { Remote, Translate } from './types'
 
 const PAGE = 800
+
+export interface Cursor {
+  line: number
+  col: number
+}
 
 interface Props {
   path: string
@@ -14,26 +19,48 @@ interface Props {
   t: Translate
   /** 1-based line to reveal after the content renders (search hits, Ctrl+G). */
   line?: number
+  /** Changes on every open request, so the same line reveals again. */
+  stamp?: number
+  /** Report the line/column under the pointer for the status bar. */
+  onCursor?: (cursor: Cursor) => void
 }
 
 type State =
   | { status: 'loading' }
-  | { status: 'ready'; text: string; count: number; eof: boolean }
+  | { status: 'ready'; text: string; count: number; eof: boolean; loadingMore: boolean }
   | { status: 'error'; message: string }
 
-/** Read-only source view: shiki highlighting, line gutter, wrap toggle, reload. */
-export function FileView({ path, sessionId, remote, t, line }: Props) {
+/** Column of a caret range inside one rendered line (character offset + 1). */
+function columnAt(line: HTMLElement, range: Range): number {
+  const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT)
+  let column = 0
+  let node = walker.nextNode()
+  while (node !== null) {
+    const text = node as Text
+    if (text === range.startContainer) return column + range.startOffset + 1
+    column += text.data.length
+    node = walker.nextNode()
+  }
+  return 1
+}
+
+/** Read-only source view: shiki highlighting, line gutter, wrap toggle, paging. */
+export function FileView({ path, sessionId, remote, t, line, stamp, onCursor }: Props) {
   const [state, setState] = React.useState<State>({ status: 'loading' })
   const [wrap, setWrap] = React.useState(false)
   const [token, setToken] = React.useState(0)
   const [dark, setDark] = React.useState(isDark)
   const [html, setHtml] = React.useState<string | null>(null)
   const container = React.useRef<HTMLDivElement>(null)
+  const lineNodes = React.useRef<HTMLElement[]>([])
+  const hovered = React.useRef<HTMLElement | null>(null)
 
   React.useEffect(() => {
     const root = document.documentElement
     const observer = new MutationObserver(() => setDark(isDark()))
-    observer.observe(root, { attributes: true, attributeFilter: ['data-ds-dark-theme', 'class'] })
+    const options: MutationObserverInit = { attributes: true, attributeFilter: ['data-ds-dark-theme', 'class', 'style'] }
+    observer.observe(root, options)
+    observer.observe(document.body, options)
     return () => observer.disconnect()
   }, [])
 
@@ -50,7 +77,8 @@ export function FileView({ path, sessionId, remote, t, line }: Props) {
       .then((result) => {
         if (!live) return
         if (result.ok) {
-          setState({ status: 'ready', text: result.value.text, count: result.value.lines, eof: result.value.eof })
+          setState({ status: 'ready', text: result.value.text, count: result.value.lines, eof: result.value.eof, loadingMore: false })
+          onCursor?.({ line: 1, col: 1 })
         } else {
           const binary = result.error.code.includes('not-text')
           setState({ status: 'error', message: binary ? t('file.binary') : `${t('file.failed')}: ${result.error.code}` })
@@ -60,8 +88,22 @@ export function FileView({ path, sessionId, remote, t, line }: Props) {
     return () => {
       live = false
     }
-  }, [path, sessionId, remote, token, t])
+  }, [path, sessionId, remote, token, t, onCursor])
 
+  /* R1.11: a file longer than one page appends the next page on demand. */
+  const loadMore = React.useCallback(() => {
+    if (state.status !== 'ready' || state.eof || state.loadingMore || sessionId === undefined) return
+    const start = state.text.split('\n').length
+    setState({ ...state, loadingMore: true })
+    remote.workspaceFiles
+      .read(sessionId, path, { offset: start + 1, limit: PAGE })
+      .then((result) => {
+        if (!result.ok) return setState({ ...state, loadingMore: false })
+        const next = `${state.text}${state.text.endsWith('\n') ? '' : '\n'}${result.value.text}`
+        setState({ status: 'ready', text: next, count: start + result.value.lines - 1, eof: result.value.eof, loadingMore: false })
+      })
+      .catch(() => setState({ ...state, loadingMore: false }))
+  }, [path, remote, sessionId, state])
 
   React.useEffect(() => {
     if (state.status !== 'ready') return
@@ -71,6 +113,23 @@ export function FileView({ path, sessionId, remote, t, line }: Props) {
       live = false
     }
   }, [path, state, dark])
+
+  /* Cache the per-line nodes: reveal and cursor reporting both walk them. */
+  React.useEffect(() => {
+    const host = container.current
+    if (host === null) return
+    lineNodes.current = [...host.querySelectorAll<HTMLElement>('.line, [data-line]')]
+  }, [html, state])
+
+  const reveal = React.useCallback((target: number) => {
+    const host = container.current
+    if (host === null) return
+    const nodes = lineNodes.current.length > 0 ? lineNodes.current : [...host.querySelectorAll<HTMLElement>('.line, [data-line]')]
+    const element = nodes[target - 1]
+    if (element === undefined) return
+    element.scrollIntoView({ block: 'center' })
+    element.classList.add('wb-line-active')
+  }, [])
 
   // Alt+Z toggles wrap; Ctrl+G jumps to a line (R1.11).
   React.useEffect(() => {
@@ -85,24 +144,42 @@ export function FileView({ path, sessionId, remote, t, line }: Props) {
         const answer = window.prompt(t('file.gotoLine'))
         const target = Number(answer)
         if (answer === null || !Number.isFinite(target) || target < 1) return
-        const element = container.current?.querySelectorAll('.line')[target - 1] as HTMLElement | undefined
-        element?.scrollIntoView({ block: 'center' })
-        element?.classList.add('wb-line-active')
-        setTimeout(() => element?.classList.remove('wb-line-active'), 1200)
+        reveal(target)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [t])
+  }, [reveal, t])
 
-  // Reveal the requested line once content is painted (search hit / jump to line).
+  // Reveal the requested line once content is painted (search hit / jump). The
+  // stamp in the deps is what makes a second click on the same hit scroll again.
   React.useEffect(() => {
     if (line === undefined || state.status !== 'ready') return
-    const target = container.current?.querySelectorAll('.line')[line - 1] as HTMLElement | undefined
-    target?.scrollIntoView({ block: 'center' })
-    target?.classList.add('wb-line-active')
-    return () => target?.classList.remove('wb-line-active')
-  }, [line, state, html])
+    reveal(line)
+  }, [line, stamp, state, html, reveal])
+
+  const reportCursor = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (onCursor === undefined) return
+    const host = container.current
+    if (host === null) return
+    const target = (event.target as HTMLElement).closest('.line, [data-line]') as HTMLElement | null
+    if (target === null) return
+    const nodes = lineNodes.current.length > 0 ? lineNodes.current : [...host.querySelectorAll<HTMLElement>('.line, [data-line]')]
+    const index = nodes.indexOf(target)
+    if (index < 0) return
+    if (hovered.current !== target) {
+      hovered.current?.classList.remove('wb-line-hover')
+      target.classList.add('wb-line-hover')
+      hovered.current = target
+    }
+    let col = 1
+    const caret = (document as unknown as { caretRangeFromPoint?: (x: number, y: number) => Range | null }).caretRangeFromPoint?.(
+      event.clientX,
+      event.clientY,
+    )
+    if (caret != null && target.contains(caret.startContainer)) col = columnAt(target, caret)
+    onCursor({ line: index + 1, col })
+  }
 
   if (state.status === 'loading') {
     return <div className="grid h-full place-items-center text-xs text-muted-foreground">{t('file.loading')}</div>
@@ -122,7 +199,7 @@ export function FileView({ path, sessionId, remote, t, line }: Props) {
   const rows = state.text.split('\n')
   return (
     <div className="flex h-full flex-col">
-      <div ref={container} className="wb-scroll flex-1 overflow-auto">
+      <div ref={container} className="wb-scroll min-h-0 flex-1 overflow-auto" onMouseMove={reportCursor}>
         {html !== null ? (
           <div
             className={cn('wb-shiki', wrap && 'wb-code-wrap')}
@@ -130,22 +207,28 @@ export function FileView({ path, sessionId, remote, t, line }: Props) {
             dangerouslySetInnerHTML={{ __html: html }}
           />
         ) : (
-          <div className="wb-code flex py-2">
-            <div className="select-none border-r border-border px-2 text-right text-muted-foreground" aria-hidden>
-              {rows.map((_, index) => (
-                <div key={index}>{index + 1}</div>
-              ))}
-            </div>
-            <div className={cn('flex-1 overflow-x-auto whitespace-pre px-3', wrap && 'wb-code-wrap')}>{state.text}</div>
+          <div className={cn('wb-code py-2', wrap && 'wb-code-wrap')}>
+            {rows.map((row, index) => (
+              <div key={index} className="wb-src-line" data-line={index + 1}>
+                <span className="wb-src-num">{index + 1}</span>
+                <span className="wb-src-text">{row === '' ? ' ' : row}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {!state.eof && (
+          <div className="flex justify-center py-3">
+            <Button variant="outline" size="sm" disabled={state.loadingMore} onClick={loadMore}>
+              {state.loadingMore ? t('file.loading') : t('file.loadMore')}
+            </Button>
           </div>
         )}
       </div>
-      <div className="flex h-status shrink-0 items-center gap-2 border-t border-border bg-card px-2 text-2xs text-muted-foreground">
-        <span>{languageOf(path) ?? 'plain'}</span>
+      <div className="flex h-status shrink-0 items-center gap-2 border-t border-border bg-[var(--card)] px-2 text-[10px] text-muted-foreground">
+        <span>{languageLabel(path)}</span>
         <span>{state.count}</span>
-        {!state.eof && <span>…</span>}
         <span className="ml-auto" />
-        <Button variant="ghost" size="sm" title="Wrap" onClick={() => setWrap((value) => !value)}>
+        <Button variant="ghost" size="sm" title={t('file.wrap')} onClick={() => setWrap((value) => !value)}>
           <WrapText className={cn('h-3 w-3', wrap && 'text-primary')} aria-hidden />
         </Button>
         <Button variant="ghost" size="sm" title={t('file.reload')} onClick={() => setToken((value) => value + 1)}>
@@ -155,3 +238,5 @@ export function FileView({ path, sessionId, remote, t, line }: Props) {
     </div>
   )
 }
+
+export { languageOf }

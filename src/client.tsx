@@ -11,7 +11,7 @@ import { en, NS, zh } from './locale'
 import { applyGitPanel, GitTab } from './git/tab'
 import { NotesList } from './notes/NotesList'
 import { ConversationSlot } from './panel/ConversationSlot'
-import { createRegistry, WorkbenchPanel, type TabRegistry } from './panel/WorkbenchPanel'
+import { createRegistry, lastPanel, rememberPanel, WorkbenchPanel, type Appearance, type TabRegistry } from './panel/WorkbenchPanel'
 
 /**
  * The editor (BlockNote) is loaded on demand: it is by far the heaviest thing in
@@ -62,10 +62,101 @@ function PanelIcon({ size }: { size: number }) {
   )
 }
 
-export function apply(ctx: any, config: { startup?: string } = {}): void {
+/**
+ * Row config values arrive as schemastery volatile refs (`{get()}`), not plain
+ * values: read through the ref on every use so the settings card is live.
+ */
+function value(config: Record<string, unknown>, key: string): unknown {
+  const raw = config[key]
+  if (raw !== null && typeof raw === 'object' && typeof (raw as { get?: unknown }).get === 'function') {
+    return (raw as { get: () => unknown }).get()
+  }
+  return raw
+}
+
+const UI_FAMILIES: Record<string, string> = {
+  inter: "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
+  system: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+}
+
+const CODE_FAMILIES: Record<string, string> = {
+  'jetbrains-mono': "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+  'system-mono': 'ui-monospace, SFMono-Regular, Menlo, monospace',
+}
+
+/** A font stack is only allowed to be a font stack (no CSS beyond names). */
+function fontStack(name: unknown, table: Record<string, string>): string {
+  const text = String(name ?? '').trim()
+  if (text === '' || text === 'follow') return ''
+  return table[text] ?? (/^[\w\s,'"-.]+$/.test(text) ? text : '')
+}
+
+function size(value: unknown): number {
+  const number = Number(value ?? 0)
+  return Number.isFinite(number) && number >= 8 && number <= 24 ? number : 0
+}
+
+function appearanceOf(config: Record<string, unknown>): Appearance {
+  return {
+    uiFamily: fontStack(value(config, 'fontUiFamily'), UI_FAMILIES),
+    uiSize: size(value(config, 'fontUiSize')),
+    codeFamily: fontStack(value(config, 'fontCodeFamily'), CODE_FAMILIES),
+    codeSize: size(value(config, 'fontCodeSize')),
+    codeLineHeight: Number(value(config, 'fontCodeLineHeight') ?? 0),
+  }
+}
+
+export function apply(ctx: any, config: Record<string, unknown> = {}): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-workbench: locale')
   const t = ctx.locale.bind(NS)
-  const close = () => ctx.layout.selectPanel(null)
+  /**
+   * Add project (R1.3): the host owns the workspace registry and its directory
+   * picker. This client half exposes no `add`-shaped API today (probed: only
+   * `model`/`name`/`ctx`), so the panel reports the refusal instead of a no-op.
+   */
+  const addProject = async (path: string): Promise<void> => {
+    const service = ctx.workspaces ?? ctx.workspace
+    const add =
+      (service as { add?: (path: string) => unknown } | undefined)?.add ??
+      (service as { register?: (path: string) => unknown } | undefined)?.register
+    if (typeof add !== 'function') throw new Error(t('sidebar.addProjectUnavailable'))
+    await add.call(service, path)
+  }
+  /**
+   * R1.1: entering the workbench collapses dsh's own sidebar (otherwise the user
+   * looks at two left rails), and leaving restores it. The action lives on
+   * `ctx.layout.panels` (`toggleSidebar`), not on `ctx.layout` — S10 was wrong
+   * about that; only the *state* is unreadable, so the current width is measured.
+   */
+  let collapsedByUs = false
+  const narrowEnough = (): boolean => {
+    const root = document.querySelector('.workbench-root')
+    if (root === null) return true
+    return root.getBoundingClientRect().x < 60
+  }
+  const collapseHostSidebar = (): void => {
+    try {
+      if (narrowEnough()) return
+      ;(ctx.layout.panels as { toggleSidebar?: () => void } | undefined)?.toggleSidebar?.()
+      collapsedByUs = true
+    } catch {
+      /* host without the action: the panel keeps its own back button (fallback) */
+    }
+  }
+  const restoreHostSidebar = (): void => {
+    if (!collapsedByUs) return
+    collapsedByUs = false
+    try {
+      ;(ctx.layout.panels as { toggleSidebar?: () => void } | undefined)?.toggleSidebar?.()
+    } catch {
+      /* nothing to restore */
+    }
+  }
+  const close = () => {
+    rememberPanel(null)
+    restoreHostSidebar()
+    ctx.layout.selectPanel(null)
+  }
   ctx.effect(() => installStyles(), 'dsh-workbench: styles')
 
   // T2/T3 add their tab types through this service.
@@ -118,7 +209,11 @@ export function apply(ctx: any, config: { startup?: string } = {}): void {
     try {
       return (ctx.slots.entries('main') ?? [])
         .filter((entry: any) => typeof entry?.options?.key === 'string' && entry.options.key !== PANEL_KEY)
-        .map((entry: any) => ({ key: String(entry.options.key), label: String(entry.options.label ?? entry.options.key) }))
+        .map((entry: any) => {
+          const key = String(entry.options.key)
+          const known = `apps.${key}` in zh || `apps.${key}` in en
+          return { key, label: known ? t(`apps.${key}`) : key.charAt(0).toUpperCase() + key.slice(1) }
+        })
     } catch {
       return []
     }
@@ -142,6 +237,11 @@ export function apply(ctx: any, config: { startup?: string } = {}): void {
               apps: apps(),
               openPanel: (key: string) => ctx.layout.selectPanel(key),
               registry,
+              /* Read per render: the settings card writes the same volatile refs. */
+              appearance: () => appearanceOf(config),
+              addProject,
+              collapseHostSidebar,
+              restoreHostSidebar,
             }),
           },
           WorkbenchPanel,
@@ -164,13 +264,15 @@ export function apply(ctx: any, config: { startup?: string } = {}): void {
     'dsh-workbench: sidebar launcher',
   )
 
-  // D10: land on the workbench at startup unless the user asked for the conversation.
-  // `toggleSidebar` is not on the client layout service, so the dsh sidebar stays as is
-  // (S10 fallback: no programmatic collapse, the panel keeps its own 返回会话 button).
-  if ((config.startup ?? 'workspace') !== 'conversation') {
+  /* D10 / R11: `workspace` always lands here, `last` only when this panel was
+     the last one used, `conversation` leaves dsh's own view untouched. */
+  const startup = String(value(config, 'startup') ?? 'workspace')
+  const wanted = startup === 'conversation' ? false : startup === 'last' ? lastPanel() === PANEL_KEY : true
+  if (wanted) {
     const timer = setTimeout(() => {
       try {
         ctx.layout.selectPanel(PANEL_KEY)
+        rememberPanel(PANEL_KEY)
       } catch {
         /* layout not ready: the sidebar row still works */
       }

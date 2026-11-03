@@ -6,28 +6,15 @@
  * object; nothing here touches the DOM, storage, or the host.
  */
 
-export type TabKind =
-  | 'session'
-  | 'file'
-  | 'explorer'
-  | 'search'
-  | 'terminal'
-  | 'browser'
-  | 'git'
-  | 'note'
-  | 'notes'
+/**
+ * A tab kind is any string: a registered tab type owns its kind, so a third
+ * party can add one without editing this file (the registry is the source of
+ * truth for what exists, this model only stores what was opened).
+ */
+export type TabKind = string
 
-export const KNOWN_KINDS: readonly TabKind[] = [
-  'session',
-  'file',
-  'explorer',
-  'search',
-  'terminal',
-  'browser',
-  'git',
-  'note',
-  'notes',
-]
+/** The kinds the shell itself knows how to build from the `+` menu. */
+export const BUILTIN_KINDS = ['session', 'file', 'explorer', 'search', 'terminal', 'browser', 'git', 'note', 'notes'] as const
 
 export interface TabModel {
   /** `${projectId}:${kind}:${contentId}` — dedupe key, also the React key. */
@@ -197,8 +184,10 @@ export function dropProject(layout: Layout, projectId: string): Layout {
 }
 
 /**
- * Reads persisted layout, dropping anything unrecognized: unknown tab kinds,
- * unknown projects' stray tabs, out-of-range widths, wrong schema versions.
+ * Reads persisted layout, dropping anything unrecognizable: malformed tab
+ * entries, out-of-range widths, a wrong schema version. Tab kinds are kept as-is
+ * (a plugin-registered kind must survive a reload); a kind with no registered
+ * renderer falls back to the shell's "not available" card.
  */
 export function parseLayout(raw: string | null): Layout {
   if (raw === null || raw === '') return emptyLayout()
@@ -247,8 +236,8 @@ export function parseLayout(raw: string | null): Layout {
 function parseTab(raw: unknown, projectId: string): TabModel[] {
   if (typeof raw !== 'object' || raw === null) return []
   const entry = raw as Record<string, unknown>
-  const kind = entry.kind as TabKind
-  if (!KNOWN_KINDS.includes(kind)) return []
+  const kind = entry.kind
+  if (typeof kind !== 'string' || kind.trim() === '') return []
   if (typeof entry.contentId !== 'string' || typeof entry.title !== 'string') return []
   return [
     {

@@ -48,6 +48,8 @@ export interface Project {
   title: string
   path: string
   sessionIds: string[]
+  /** True when the host reports the project has a live session. */
+  running?: boolean
 }
 
 export type Translate = (key: string) => string
@@ -63,4 +65,11 @@ export interface PanelProps {
   /** Host call: retain a Session reference for an embedded conversation occurrence. */
   retainSession?: (sessionId: string) => { sessionId: string; release(): void }
   openPanel?: (key: string) => void
+  /** `$HOME`, so the sidebar can show `~/projects/app` like the design. */
+  home?: string
+  /** Register another workspace (the `Add project` row and `+` menu). */
+  addProject?: (path: string) => Promise<void>
+  /** Collapse / restore dsh's own sidebar around the panel (R1.1). */
+  collapseHostSidebar?: () => void
+  restoreHostSidebar?: () => void
 }

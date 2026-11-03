@@ -102,7 +102,7 @@ test('a reload keeps tabs, order, active tab and sidebar state', () => {
   assert.deepEqual(state.sidebar, { width: 300, collapsed: true })
 })
 
-test('a reload drops unknown tab kinds and a stale schema', () => {
+test('a reload keeps plugin-registered kinds, drops a stale schema and garbage', () => {
   const raw = JSON.stringify({
     schemaVersion: 2,
     activeProjectId: A,
@@ -119,7 +119,16 @@ test('a reload drops unknown tab kinds and a stale schema', () => {
     },
   })
   const restored = parseLayout(raw)
-  assert.deepEqual(projectState(restored, A).tabs.map((tab) => tab.kind), ['file'])
+  /* Unknown kinds survive: a registered tab type must outlive a page reload. */
+  assert.deepEqual(projectState(restored, A).tabs.map((tab) => tab.kind), ['file', 'from-the-future'])
+  const garbage = parseLayout(
+    JSON.stringify({
+      schemaVersion: 2,
+      activeProjectId: null,
+      projects: { [A]: { tabs: [{ kind: '', contentId: 'x', title: 'x' }, { kind: 'file' }], sidebar: {} } },
+    }),
+  )
+  assert.deepEqual(projectState(garbage, A).tabs, [])
   assert.equal(projectState(restored, A).activeTabId, tabId(A, 'file', 'keep.ts'))
   assert.deepEqual(parseLayout(JSON.stringify({ schemaVersion: 1, projects: {} })), emptyLayout())
   assert.deepEqual(parseLayout('not json'), emptyLayout())

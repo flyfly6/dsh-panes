@@ -33,15 +33,7 @@ interface Hit {
 
 type Sort = 'updated' | 'title'
 
-export function NotesList({
-  t,
-  open,
-  initialPath,
-}: {
-  t: Translate
-  open: (path: string) => void
-  initialPath?: string
-}) {
+export function NotesList({ t, open }: { t: Translate; open: (path: string) => void }) {
   const [notes, setNotes] = React.useState<NoteEntry[]>([])
   const [vaultPath, setVaultPath] = React.useState('')
   const [query, setQuery] = React.useState('')
@@ -152,6 +144,9 @@ export function NotesList({
         >
           {sort === 'updated' ? t('notes.sort.updated') : t('notes.sort.title')}
         </Button>
+        <span className="shrink-0 text-[10px] text-muted-foreground" title={vaultPath}>
+          {t('notes.count').replace('{n}', String(notes.length))}
+        </span>
         <Button size="sm" variant="outline" disabled={busy} onClick={() => void create()}>
           <Plus className="h-3 w-3" aria-hidden /> {t('notes.new')}
         </Button>
@@ -167,10 +162,7 @@ export function NotesList({
           rows.map((note) => (
             <div
               key={note.path}
-              className={cn(
-                'group flex items-start gap-2 border-b border-border px-3 py-2 hover:bg-accent',
-                note.path === initialPath && 'bg-accent',
-              )}
+              className="group flex items-start gap-2 border-b border-border px-3 py-2 hover:bg-accent"
             >
               <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
               <button type="button" className="min-w-0 flex-1 text-left" onClick={() => open(note.path)}>
@@ -196,10 +188,6 @@ export function NotesList({
             </div>
           ))
         )}
-      </div>
-      <div className="flex h-status shrink-0 items-center gap-3 border-t border-border bg-card px-3 text-2xs text-muted-foreground">
-        <span className="truncate">{vaultPath}</span>
-        <span className="ml-auto">{t('notes.count').replace('{n}', String(notes.length))}</span>
       </div>
     </div>
   )

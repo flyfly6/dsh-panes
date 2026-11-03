@@ -100,12 +100,45 @@ function highlighter(): Promise<HighlighterCore> {
   return pending
 }
 
-/** Host dark mode: the desktop shell marks the root element. */
+/**
+ * Host dark mode. dsh marks it with an attribute on `<body>` whose *presence*
+ * is the signal (`data-ds-dark-theme=""`), and sets `color-scheme: dark` on the
+ * root element; older builds used `data-ds-dark-theme="dark"` on `<html>`.
+ */
 export function isDark(): boolean {
+  const body = document.body
+  if (body !== null && body.hasAttribute('data-ds-dark-theme')) return body.getAttribute('data-ds-dark-theme') !== 'light'
   const root = document.documentElement
-  if (root.dataset.dsDarkTheme === 'dark') return true
+  if (root.dataset.dsDarkTheme !== undefined) return root.dataset.dsDarkTheme !== 'light'
+  if (root.style.colorScheme === 'dark') return true
   if (root.classList.contains('dark')) return true
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches === true && root.dataset.dsDarkTheme !== 'light'
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches === true
+}
+
+/** Human label for the status bar / breadcrumb ("TypeScript JSX", not "tsx"). */
+const LABELS: Record<string, string> = {
+  bash: 'Shell Script',
+  css: 'CSS',
+  diff: 'Diff',
+  go: 'Go',
+  html: 'HTML',
+  java: 'Java',
+  javascript: 'JavaScript',
+  json: 'JSON',
+  jsx: 'JavaScript JSX',
+  markdown: 'Markdown',
+  python: 'Python',
+  rust: 'Rust',
+  sql: 'SQL',
+  tsx: 'TypeScript JSX',
+  typescript: 'TypeScript',
+  yaml: 'YAML',
+}
+
+export function languageLabel(path: string): string {
+  const language = languageOf(path)
+  if (language === undefined) return 'Plain Text'
+  return LABELS[language] ?? language
 }
 
 /** Markdown fence aliases → loaded grammar id. */

@@ -13,6 +13,8 @@ interface Props {
   remote: Remote
   t: Translate
   line?: number
+  /** Changes on every open request, so a repeated hit reveals the line again. */
+  stamp?: number
   /** Tab identity, so the preview comes back to where the user left it. */
   scrollKey?: string
 }
@@ -23,7 +25,7 @@ const SCROLL = new Map<string, number>()
 type Mode = 'preview' | 'source'
 
 /** `.md`/`.mdx` renders as GFM by default; Ctrl+Shift+V or the toggle shows source. */
-export function MarkdownView({ path, sessionId, remote, t, line, scrollKey }: Props) {
+export function MarkdownView({ path, sessionId, remote, t, line, stamp, scrollKey }: Props) {
   const [mode, setMode] = React.useState<Mode>('preview')
   const [html, setHtml] = React.useState<string | null>(null)
   const [error, setError] = React.useState('')
@@ -95,7 +97,7 @@ export function MarkdownView({ path, sessionId, remote, t, line, scrollKey }: Pr
           </Button>
         </div>
         <div className="min-h-0 flex-1">
-          <FileView path={path} sessionId={sessionId} remote={remote} t={t} line={line} />
+          <FileView path={path} sessionId={sessionId} remote={remote} t={t} line={line} stamp={stamp} />
         </div>
       </div>
     )

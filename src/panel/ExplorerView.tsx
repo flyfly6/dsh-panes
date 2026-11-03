@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { ChevronDown, ChevronRight, File, Folder } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileCode2, Folder } from 'lucide-react'
 import { call } from '../api'
 import { Button } from '../ui/button'
 import { cn } from '../ui/cn'
@@ -14,6 +14,22 @@ interface Props {
 }
 
 type Branch = DirectoryEntry[] | 'loading' | 'error'
+
+/** Hidden by default (R1.8); the real ignores are the host's, this is the floor. */
+const HIDDEN = new Set(['.git', 'node_modules', '.next', 'dist', 'build', '.turbo', '.cache', 'coverage', '.DS_Store'])
+
+/** Files get the colour of their language, so a tree stays scannable. */
+function tintOf(name: string): string {
+  const extension = name.slice(name.lastIndexOf('.') + 1).toLowerCase()
+  if (['ts', 'tsx'].includes(extension)) return '#3B6FF5'
+  if (['js', 'jsx', 'mjs', 'cjs'].includes(extension)) return '#9A6700'
+  if (['json', 'jsonc'].includes(extension)) return '#9A6700'
+  if (['md', 'mdx'].includes(extension)) return '#6E7781'
+  if (['css', 'scss', 'less'].includes(extension)) return '#8250DF'
+  if (['html', 'vue'].includes(extension)) return '#CF222E'
+  if (['png', 'jpg', 'jpeg', 'svg', 'gif', 'webp'].includes(extension)) return '#1A7F37'
+  return 'currentColor'
+}
 
 /** Lazy directory tree over `workspaceFiles.list`; click a file to open a tab. */
 export function ExplorerView({ root, sessionId, remote, onOpen, t }: Props) {
@@ -38,7 +54,10 @@ export function ExplorerView({ root, sessionId, remote, onOpen, t }: Props) {
       remote.workspaceFiles
         .list(sessionId, relative === '' ? '.' : relative)
         .then((result) =>
-          setBranches((prev) => ({ ...prev, [relative]: result.ok ? result.value.entries : 'error' })),
+          setBranches((prev) => ({
+            ...prev,
+            [relative]: result.ok ? result.value.entries.filter((entry) => !HIDDEN.has(entry.name)) : 'error',
+          })),
         )
         .catch(() => setBranches((prev) => ({ ...prev, [relative]: 'error' })))
     },
@@ -93,7 +112,7 @@ export function ExplorerView({ root, sessionId, remote, onOpen, t }: Props) {
             {isDir ? (
               <Folder className="h-3 w-3 text-muted-foreground" aria-hidden />
             ) : (
-              <File className="h-3 w-3 text-muted-foreground" aria-hidden />
+              <FileCode2 className="h-3 w-3" style={{ color: tintOf(child.name) }} aria-hidden />
             )}
             <span className="truncate">{child.name}</span>
           </Button>

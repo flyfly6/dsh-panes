@@ -3,18 +3,18 @@
  *
  * Storage is `.md` (D4 + the (a) decision): the host owns the frontmatter and
  * this half only ever sees/edits the body. BlockNote's markdown conversion is
- * lossy, so a note whose round trip does not reproduce the original opens in a
- * read-only preview first, with an explicit way into the editor — the alternative
- * (silently normalising someone's Obsidian note on first save) is data loss.
+ * lossy, so a note whose round trip does not reproduce the original gets a banner
+ * saying so (still editable) — silently normalising someone's Obsidian note on
+ * the first save is the thing we are avoiding.
  */
 import * as React from 'react'
 import { BlockNoteView } from '@blocknote/ariakit'
 import { useCreateBlockNote } from '@blocknote/react'
-import { AlertTriangle, Check, Loader2 } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { call } from '../api'
 import { Button } from '../ui/button'
-import { cn } from '../ui/cn'
-import { setNoteDirty } from './store'
+import { isDark } from '../highlight'
+import { setNoteDirty, setNoteStatus } from './store'
 import type { Translate } from '../panel/types'
 
 interface NoteDoc {
@@ -22,18 +22,22 @@ interface NoteDoc {
   body: string
   title: string
   etag: string
+  tags: string[]
+  updated: string
 }
 
 type Status = 'saved' | 'dirty' | 'saving' | 'conflict'
 
 /**
- * Round-trip comparison for the lossy warning. Whitespace carries no meaning in
- * Markdown, and BlockNote re-pads table cells and list markers — comparing with
- * every space removed keeps the warning about CONTENT it cannot represent, not
- * about formatting it merely normalises.
+ * Would saving change what the note *means*? BlockNote round-trips ordinary
+ * markdown but normalises lists, rules and table padding, so a whole-document
+ * round-trip comparison fires on almost every real note (noise). The constructs
+ * the editor genuinely cannot express are footnotes and raw HTML, so the warning
+ * keys on those instead — inside code fences they are just text and ignored.
  */
-function normal(markdown: string): string {
-  return markdown.replace(/\s+/g, '')
+function hasUnsupportedSyntax(markdown: string): boolean {
+  const withoutCode = markdown.replace(/```[\s\S]*?```/g, '').replace(/`[^`]*`/g, '')
+  return /\[\^[^\]]+\]/.test(withoutCode) || /<\/?[a-z][^>]*>/i.test(withoutCode)
 }
 
 export function NoteEditor({ path, t }: { path: string; t: Translate }) {
@@ -44,9 +48,18 @@ export function NoteEditor({ path, t }: { path: string; t: Translate }) {
     let live = true
     setDoc(null)
     setError('')
-    call<{ body: string; meta: { title: string }; etag: string }>('notes.read', { path })
+    call<{ body: string; meta: { title: string; tags?: string[]; updated?: string }; etag: string }>('notes.read', { path })
       .then((read) => {
-        if (live) setDoc({ path, body: read.body, title: read.meta.title ?? '', etag: read.etag })
+        if (live) {
+          setDoc({
+            path,
+            body: read.body,
+            title: read.meta.title ?? '',
+            etag: read.etag,
+            tags: Array.isArray(read.meta.tags) ? read.meta.tags : [],
+            updated: read.meta.updated ?? '',
+          })
+        }
       })
       .catch((failure: Error) => live && setError(failure.message))
     return () => {
@@ -59,12 +72,16 @@ export function NoteEditor({ path, t }: { path: string; t: Translate }) {
   return <NoteBody key={doc.path} initial={doc} t={t} />
 }
 
-function prefersDark(): boolean {
-  const root = document.documentElement
-  const attr = root.getAttribute('data-theme') ?? root.dataset.theme ?? root.className
-  if (/dark/i.test(attr)) return true
-  if (/light/i.test(attr)) return false
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches === true
+/** How the note was last touched, in words (design: "最后编辑 2 分钟前"). */
+function editedAgo(iso: string, t: Translate): string {
+  const at = Date.parse(iso)
+  if (!Number.isFinite(at)) return ''
+  const minutes = Math.max(0, Math.round((Date.now() - at) / 60000))
+  if (minutes < 1) return t('notes.edited.justNow')
+  if (minutes < 60) return t('notes.edited.minutes').replace('{n}', String(minutes))
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return t('notes.edited.hours').replace('{n}', String(hours))
+  return t('notes.edited.days').replace('{n}', String(Math.round(hours / 24)))
 }
 
 function NoteBody({ initial, t }: { initial: NoteDoc; t: Translate }) {
@@ -85,7 +102,7 @@ function NoteBody({ initial, t }: { initial: NoteDoc; t: Translate }) {
   const load = React.useCallback(
     (body: string) => {
       const blocks = editor.tryParseMarkdownToBlocks(body)
-      setLossy(normal(editor.blocksToMarkdownLossy(blocks)) !== normal(body))
+      setLossy(hasUnsupportedSyntax(body))
       quiet.current = true
       editor.replaceBlocks(editor.document, blocks)
       window.setTimeout(() => {
@@ -165,8 +182,10 @@ function NoteBody({ initial, t }: { initial: NoteDoc; t: Translate }) {
     load(read.body)
   }
 
-  const statusText =
-    status === 'saved' ? t('notes.saved') : status === 'saving' ? t('notes.saving') : status === 'conflict' ? t('notes.conflict') : t('notes.dirty')
+  /* The tab breadcrumb shows the same state, so it reaches the shell from here. */
+  React.useEffect(() => {
+    setNoteStatus(initial.path, status)
+  }, [initial.path, status])
 
   return (
     <div className="wb-note">
@@ -203,16 +222,16 @@ function NoteBody({ initial, t }: { initial: NoteDoc; t: Translate }) {
               if (event.key === 'Enter') event.currentTarget.blur()
             }}
           />
-          <BlockNoteView editor={editor} theme={prefersDark() ? 'dark' : 'light'} data-note-editor="" />
+          <div className="wb-note-meta">
+            {initial.tags.map((tag) => (
+              <span key={tag} className="wb-note-tag">
+                {tag}
+              </span>
+            ))}
+            {initial.updated !== '' && <span className="wb-note-edited">{t('notes.edited')} {editedAgo(initial.updated, t)}</span>}
+          </div>
+          <BlockNoteView editor={editor} theme={isDark() ? 'dark' : 'light'} data-note-editor="" />
         </div>
-      </div>
-      <div className="wb-note-status" data-note-status={status}>
-        <span className="truncate">{initial.path}</span>
-        <span className="ml-auto flex items-center gap-1">
-          {status === 'saving' ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> : null}
-          {status === 'saved' ? <Check className="h-3 w-3" aria-hidden /> : null}
-          <span className={cn(status === 'conflict' && 'text-destructive')}>{statusText}</span>
-        </span>
       </div>
     </div>
   )
