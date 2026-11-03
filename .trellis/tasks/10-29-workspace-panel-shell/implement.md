@@ -56,7 +56,7 @@
 ## 8. 会话 / 终端 / 浏览器 tab
 
 - [x] 会话：**真内嵌已打通**。照 `ui-subagent/sidebar-chat` 的受支持写法——面板声明 session 作用域 child slot（`workbench.conversation`）拿到 `SessionProvider` + `renderSlot`；`ctx.sessions.retain(sessionId, {source:'workbench'})` 得 `SessionReference`（tab 卸载时 release）；child 组件用 `renderFactorySlot('conversation.content', { variant:'embedded', phase, hero }, { slots:{ views } })` 渲染宿主对话。`contentId = sessionId` 保证同一 session 只一个 tab。实测 tab 内出现完整对话头 + composer + 发送按钮，`Guarded` 兜底回占位卡。
-- [ ] 终端：复用 terminal controller（list → attach → 读写）；关闭调终止；不可用降级为跳转按钮。
+- [x] 终端：复用宿主 `ctx.webTerminals.view(sessionId, key, contentId)`（`dsh-api-terminal-controller` 的 `ClientTerminals` 服务），`mount/write/resize/acknowledge/close` 全用它，不自己起 PTY；frame 分 `snapshot`（先 `term.reset()` 再整屏写）/`output`（追加）/`state|ack`，写完 `acknowledge(revision)`。xterm + fit addon 打包进 bundle（S2），`ResizeObserver` 重排；关闭 tab 走 `close()` 结束进程，切换 tab 只 detach。实测：提示符出现、输入 `echo workbench-ok` 有回显。bundle gzip 406KB → 550KB。
 - [x] 浏览器：iframe + 自管历史（后退/前进/刷新）+ 地址栏；非 http(s) 自动补 `https://`，非法输入不导航；`sandbox` + `referrerPolicy`；底部固定「部分站点禁止被嵌入」提示。实测 `+`→浏览器→输 `example.com`：iframe `src=https://example.com`、tab 标题同步为 `example.com`。
 
 ## 9. 验证

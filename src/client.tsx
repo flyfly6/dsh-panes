@@ -14,7 +14,7 @@ const PLUGIN_ID = 'dsh-workbench'
 const PANEL_KEY = 'workbench'
 
 export const name = PLUGIN_ID
-export const inject = ['slots', 'layout', 'locale', 'workspaces', 'sessions', 'remote', 'remote.workspaceFiles'] as const
+export const inject = ['slots', 'layout', 'locale', 'workspaces', 'sessions', 'webTerminals', 'remote', 'remote.workspaceFiles'] as const
 
 function installStyles(): () => void {
   const style = document.createElement('style')
@@ -81,6 +81,7 @@ export function apply(ctx: any, config: { startup?: string } = {}): void {
               close,
               remote: ctx.remote,
               retainSession: (sessionId: string) => ctx.sessions.retain(sessionId, { source: 'workbench' }),
+              terminal: (sessionId: string, key: string, contentId: string) => ctx.webTerminals.view(sessionId, key, contentId),
               apps: apps(),
               openPanel: (key: string) => ctx.layout.selectPanel(key),
               registry,

@@ -48,6 +48,7 @@ import { FileView } from './FileView'
 import { BrowserView } from './BrowserView'
 import { SessionCard } from './SessionCard'
 import { Guarded } from './Guarded'
+import { closeTerminalModel, TerminalView as TerminalPane, type TerminalModel } from './TerminalView'
 import { MarkdownView } from './MarkdownView'
 import { QuickOpen } from './QuickOpen'
 import { SearchView } from './SearchView'
@@ -105,6 +106,27 @@ function projectsOf(items: unknown): Project[] {
     path: String(item.path ?? ''),
     sessionIds: Array.isArray(item.sessionIds) ? item.sessionIds.map(String) : [],
   }))
+}
+
+/** One terminal occurrence: the host model is created once per tab. */
+function TerminalTab({
+  tabId,
+  contentId,
+  sessionId,
+  openModel,
+  t,
+}: {
+  tabId: string
+  contentId: string
+  sessionId: string
+  openModel: (sessionId: string, key: string, contentId: string) => unknown
+  t: (key: string) => string
+}) {
+  const model = React.useMemo(
+    () => openModel(sessionId, tabId, contentId) as TerminalModel,
+    [contentId, openModel, sessionId, tabId],
+  )
+  return <TerminalPane modelKey={`${sessionId}:${tabId}`} model={model} t={t} />
 }
 
 /** Retains a Session reference for as long as the tab lives, then releases it. */
@@ -195,7 +217,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
         open({ kind: 'search', contentId: 'search', title: t('tab.search') })
       } else if (key === 'w' && activeTab !== undefined && activeProjectId !== null) {
         event.preventDefault()
-        setLayout((prev) => closeTab(prev, activeProjectId, activeTab.id))
+        closeOne(activeTab.id)
       } else if (key === 'b' && activeProjectId !== null) {
         event.preventDefault()
         setLayout((prev) => setSidebar(prev, activeProjectId, { collapsed: !projectState(prev, activeProjectId).sidebar.collapsed }))
@@ -215,6 +237,15 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [activeProjectId, activeTab, close, state.tabs, state.activeTabId])
+
+  /** Closing a terminal tab ends its process (R1.13). */
+  const closeOne = (id: string) => {
+    if (activeProjectId === null) return
+    const tab = projectState(layout, activeProjectId).tabs.find((candidate) => candidate.id === id)
+    const sessionId = project?.sessionIds[0]
+    if (tab?.kind === 'terminal' && sessionId !== undefined) closeTerminalModel(`${sessionId}:${id}`)
+    setLayout((prev) => closeTab(prev, activeProjectId, id))
+  }
 
   const selectTab = (id: string) => {
     if (activeProjectId === null) return
@@ -243,6 +274,13 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
     }
     if (kind === 'browser') {
       open({ kind: 'browser', contentId: 'about:blank', title: t('tab.browser') })
+      return
+    }
+    if (kind === 'terminal') {
+      const sessionId = project?.sessionIds[0]
+      if (sessionId === undefined) return
+      const contentId = `term-${Date.now().toString(36)}`
+      open({ kind: 'terminal', contentId, title: t('tab.terminal') })
       return
     }
     if (kind === 'session') {
@@ -392,7 +430,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
             onClick={() => selectTab(tab.id)}
             onKeyDown={(event) => event.key === 'Enter' && selectTab(tab.id)}
             onAuxClick={(event) => {
-              if (event.button === 1 && activeProjectId !== null) setLayout((prev) => closeTab(prev, activeProjectId, tab.id))
+              if (event.button === 1 && activeProjectId !== null) closeOne(tab.id)
             }}
             className={cn(
               'group flex cursor-pointer items-center gap-1.5 whitespace-nowrap border-r border-t-2 border-border border-t-transparent px-2.5 text-xs text-muted-foreground',
@@ -407,7 +445,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
               className="grid h-3.5 w-3.5 place-items-center rounded opacity-0 hover:bg-accent group-hover:opacity-60"
               onClick={(event) => {
                 event.stopPropagation()
-                if (activeProjectId !== null) setLayout((prev) => closeTab(prev, activeProjectId, tab.id))
+                if (activeProjectId !== null) closeOne(tab.id)
               }}
             >
               <X className="h-2.5 w-2.5" aria-hidden />
@@ -531,6 +569,20 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
         t={t}
       />
     )
+  } else if (activeTab.kind === 'terminal') {
+    const sessionId = project?.sessionIds[0]
+    content =
+      sessionId !== undefined && props.terminal !== undefined ? (
+        <TerminalTab
+          tabId={activeTab.id}
+          contentId={activeTab.contentId}
+          sessionId={sessionId}
+          openModel={props.terminal}
+          t={t}
+        />
+      ) : (
+        <div className="grid h-full place-content-center text-xs text-muted-foreground">{t('terminal.unavailable')}</div>
+      )
   } else if (activeTab.kind === 'session') {
     content =
       (props as any).SessionProvider !== undefined && (props as any).renderSlot !== undefined && props.retainSession !== undefined ? (
