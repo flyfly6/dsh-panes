@@ -29,8 +29,17 @@ function live(schema: any): any {
 
 function build(schema: any): any {
   const shape: Record<string, unknown> = {
-    /** Panel startup surface: 'workbench' (this panel) or 'conversation'. */
-    startup: live(schema.string().default('workbench')),
+    /**
+     * Panel startup surface (R11): `workspace` always lands here, `last` lands
+     * here when it was here last time, `conversation` leaves dsh's own view.
+     */
+    startup: live(schema.string().default('workspace')),
+    /* Appearance (R10). Empty = follow the host; a value may be a font stack. */
+    fontUiFamily: live(schema.string().default('')),
+    fontUiSize: live(schema.number().default(0)),
+    fontCodeFamily: live(schema.string().default('')),
+    fontCodeSize: live(schema.number().default(0)),
+    fontCodeLineHeight: live(schema.number().default(0)),
     /* Git settings (T2 §R2.13). Empty strings mean "follow the session". */
     commitModel: live(schema.string().default('')),
     commitReasoning: live(schema.string().default('')),

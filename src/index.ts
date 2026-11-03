@@ -118,7 +118,6 @@ export function createOps(readConfig: () => PluginConfig) {
     // reachable from all of them.
     ...notes,
     ping: () => ({ plugin: PLUGIN_ID, alive: true }),
-    'config.get': () => readConfig(),
     search: (args: Json, signal?: AbortSignal) => search({ ...(args as any), signal }),
     'path.reveal': async (args: Json) => {
       const target = path.resolve(String(args.path ?? ''))

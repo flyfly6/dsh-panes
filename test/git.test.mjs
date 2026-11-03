@@ -108,7 +108,6 @@ test('push is refused until experimentalRemoteOps is on', async () => {
   const allowed = await send('push', { cwd: repo })
   /* No remote: git itself fails now — the point is the config gate is gone. */
   assert.notEqual(allowed.body?.error?.code, 'disabled-by-config')
-  execFileSync('git', ['init', '-q', '-b', 'wb-fresh'], { cwd: fresh })
   gitHost.configure({})
 })
 

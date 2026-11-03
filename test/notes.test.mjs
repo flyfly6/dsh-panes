@@ -4,7 +4,7 @@
  */
 import { after, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { createNotesOps, splitFrontmatter, upsertFrontmatter } from '../src/notes.ts'
@@ -33,7 +33,17 @@ test('create writes a slugged file with frontmatter and a heading', async () => 
   assert.equal(created.path, 'my-first-note.md')
   const text = readFileSync(path.join(vault, created.path), 'utf8')
   assert.match(text, /^---\ntitle: My First Note\ncreated: /)
-  assert.match(text, /# My First Note/)
+  /* The editor shows the title in its own input; the file carries no heading. */
+  assert.equal(text.split('---').pop()?.trim(), '')
+})
+
+test('create requires a title, and the body starts empty (the editor owns the title)', async () => {
+  await assert.rejects(() => call('notes.create', { title: '  ' }), (error) => {
+    assert.equal(error.code, 'notes/bad-title')
+    return true
+  })
+  const created = await call('notes.create', { title: 'Empty Body' })
+  assert.equal(readFileSync(path.join(vault, created.path), 'utf8').split('---').pop()?.trim(), '')
 })
 
 test('a second note with the same title gets a numeric suffix', async () => {
@@ -109,16 +119,22 @@ test('paths that leave the vault are refused', async () => {
   }
 })
 
-test('a symlink pointing outside the vault is not a note address', async () => {
+test('a symlink is not a note address, and `..` never leaves the vault', async () => {
   const outside = mkdtempSync(path.join(tmpdir(), 'wb-outside-'))
   writeFileSync(path.join(outside, 'secret.md'), 'secret\n', 'utf8')
   mkdirSync(path.join(vault, 'sub'), { recursive: true })
-  /* Node has no portable symlink in tests without fs.symlinkSync on Windows;
-     the fence itself is path-based, so a `..` inside a subdirectory proves it. */
   await assert.rejects(() => call('notes.read', { path: 'sub/../../secret.md' }), (error) => {
     assert.equal(error.code, 'notes/bad-path')
     return true
   })
+  /* A link inside the vault to a file outside it: lstat refuses it, so the read
+     cannot follow the link out and a write cannot clobber the link's target. */
+  symlinkSync(path.join(outside, 'secret.md'), path.join(vault, 'link.md'))
+  await assert.rejects(() => call('notes.read', { path: 'link.md' }), (error) => {
+    assert.equal(error.code, 'notes/bad-path')
+    return true
+  })
+  assert.equal(readFileSync(path.join(outside, 'secret.md'), 'utf8'), 'secret\n')
 })
 
 test('frontmatter helpers: missing fence, stray fences in the body', () => {

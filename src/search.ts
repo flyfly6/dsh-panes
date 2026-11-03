@@ -165,13 +165,17 @@ export async function searchByName(request: SearchRequest): Promise<SearchReport
   }
 
   const files: string[] = []
+  let capped = false
   for await (const file of walkFiles(root)) {
     if (!matchesGlobs(file, globs)) continue
     files.push(file)
-    if (files.length >= MAX_FILES) break
+    if (files.length >= MAX_FILES) {
+      capped = true
+      break
+    }
   }
   const hits = rank(files, query, limit)
-  return { hits, truncated: hits.length >= limit, engine: 'js' }
+  return { hits, truncated: capped || hits.length >= limit, engine: 'js' }
 }
 
 interface RgMatch {
@@ -284,15 +288,19 @@ export async function searchInContent(request: SearchRequest): Promise<SearchRep
   }
 
   let batch: string[] = []
+  let scanned = 0
+  let capped = false
   for await (const file of walkFiles(root)) {
     batch.push(file)
+    scanned += 1
+    if (scanned >= MAX_FILES) capped = true
     if (batch.length < CONCURRENCY) continue
     await Promise.all(batch.map(scan))
     batch = []
-    if (truncated) break
+    if (truncated || capped) break
   }
-  if (!truncated) await Promise.all(batch.map(scan))
-  return { hits, truncated, engine: 'js' }
+  if (!truncated && !capped) await Promise.all(batch.map(scan))
+  return { hits, truncated: truncated || capped, engine: 'js' }
 }
 
 export async function search(request: SearchRequest): Promise<unknown> {

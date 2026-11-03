@@ -7,13 +7,14 @@
  * `updated`, and refuses a write whose etag no longer matches — an outside edit
  * (Obsidian, another editor) turns into a conflict instead of a silent overwrite.
  *
- * Path safety: every path the client sends is vault-relative, and the resolved
- * real path has to stay inside the vault — `..`, absolute paths, NUL bytes and
- * symlinks pointing outside are refused before any fs call.
+ * Path safety: every path the client sends is vault-relative and stays inside the
+ * vault — `..`, absolute paths and NUL bytes fail the path fence; a symlink fails
+ * the `lstat` check on the note itself (a link inside the vault can point
+ * anywhere, and `stat`/`readFile` would follow it out).
  */
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -86,12 +87,16 @@ function relativeOf(relPath: unknown): string {
   return joined
 }
 
-/** Absolute path of a note, verified to resolve inside the vault. */
+/** Absolute path of a note, inside the vault, and not a symlink. */
 export async function notePath(root: string, relPath: unknown): Promise<{ rel: string; abs: string }> {
   const rel = relativeOf(relPath)
   const abs = path.join(root, rel)
   const inside = path.relative(root, abs)
   if (inside.startsWith('..') || path.isAbsolute(inside)) throw new NotesError('notes/bad-path', 'path leaves the vault')
+  /* A link inside the vault can point outside it; every op below would follow it.
+     A missing file is fine here — the callers report their own not-found. */
+  const info = await lstat(abs).catch(() => null)
+  if (info !== null && info.isSymbolicLink()) throw new NotesError('notes/bad-path', 'a symlink is not a note')
   return { rel, abs }
 }
 
@@ -320,11 +325,16 @@ export function createNotesOps(readConfig: () => Record<string, unknown>): Notes
 
     'notes.create': async (args) => {
       const base = await root()
-      const title = String(args.title ?? '').trim() || '未命名笔记'
+      /* The title is user-facing text: the client's locale owns it, not this half
+         (a hardcoded default here would leak one language into the other). */
+      const title = String(args.title ?? '').trim()
+      if (title === '') throw new NotesError('notes/bad-title', 'a title is required')
       const rel = await uniqueRel(base, slugify(title))
       const stamp = new Date().toISOString()
       const lines = upsertFrontmatter([], { title, created: stamp, updated: stamp })
-      await atomicWrite(path.join(base, rel), assemble(lines, `# ${title}\n\n`))
+      /* The editor's own title input shows the title; a `# title` block here
+         would render it a second time (design P4 has one big title only). */
+      await atomicWrite(path.join(base, rel), assemble(lines, ''))
       return { path: rel, title }
     },
 

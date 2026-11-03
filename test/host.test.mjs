@@ -19,9 +19,9 @@ before(async () => {
 
 after(() => server.close())
 
-function send({ method = 'POST', body, headers = {} } = {}) {
+function send({ method = 'POST', body, raw, headers = {} } = {}) {
   return new Promise((resolve, reject) => {
-    const payload = body === undefined ? '' : JSON.stringify(body)
+    const payload = raw ?? (body === undefined ? '' : JSON.stringify(body))
     const req = request(
       {
         host: '127.0.0.1',
@@ -53,11 +53,6 @@ test('ping answers for the plugin page', async () => {
   assert.equal(res.body.data.plugin, PLUGIN)
 })
 
-test('config.get returns the live plugin config', async () => {
-  const res = await send({ body: { op: 'config.get' } })
-  assert.deepEqual(res.body.data, { startup: 'workspace' })
-})
-
 test('a request without the plugin header is refused', async () => {
   const res = await send({ body: { op: 'ping' }, headers: { 'x-dsh-plugin': 'something-else' } })
   assert.equal(res.status, 403)
@@ -82,8 +77,14 @@ test('unknown ops name themselves', async () => {
   assert.equal(res.body.code, 'unknown-op')
 })
 
-test('a malformed body fails cleanly', async () => {
+test('a body without an op is an unknown op', async () => {
   const res = await send({ body: {} })
   assert.equal(res.body.ok, false)
   assert.equal(res.body.code, 'unknown-op')
+})
+
+test('unparseable JSON is a bad-request, not a crash', async () => {
+  const res = await send({ raw: '{not json' })
+  assert.equal(res.status, 400)
+  assert.equal(res.body.code, 'bad-request')
 })
