@@ -30,8 +30,11 @@
   --accent: #3B6FF5;
   --hover: #ECEEF2;
   --radius: 6px;
-  --wb-font-ui: var(--dsh-font-family-sans, 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif);
-  --wb-font-code: var(--dsh-font-family-mono, 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace);
+  /* Literal stacks, not `var(--dsh-font-family-*)`: the host may define those as
+     an empty string, which makes the whole font-family declaration invalid.
+     Settings override these through the same variables. */
+  --wb-font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', sans-serif;
+  --wb-font-code: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --wb-font-ui-size: 12px;
   --wb-font-code-size: 12px;
   --wb-code-line-height: 22px;
