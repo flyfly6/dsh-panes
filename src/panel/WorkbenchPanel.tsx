@@ -45,6 +45,8 @@ import { Input } from '../ui/input'
 import { cn } from '../ui/cn'
 import { ExplorerView } from './ExplorerView'
 import { FileView } from './FileView'
+import { QuickOpen } from './QuickOpen'
+import { SearchView } from './SearchView'
 import type { PanelProps, Project } from './types'
 
 const STORE_KEY = 'dsh-workbench:layout'
@@ -107,6 +109,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
   const projects = React.useMemo(() => projectsOf(items), [items])
   const [layout, setLayout] = React.useState<Layout>(readStored)
   const [filter, setFilter] = React.useState('')
+  const [quickOpen, setQuickOpen] = React.useState(false)
   const dragIndex = React.useRef<number | null>(null)
 
   React.useEffect(() => {
@@ -135,13 +138,19 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId)
 
   const open = React.useCallback(
-    (input: { kind: TabKind; contentId: string; title: string }) => {
+    (input: { kind: TabKind; contentId: string; title: string; params?: Record<string, unknown> }) => {
       if (activeProjectId !== null) setLayout((prev) => openTab(prev, activeProjectId, input))
     },
     [activeProjectId],
   )
   const openFile = React.useCallback(
-    (path: string, name?: string) => open({ kind: 'file', contentId: path, title: name ?? path.split('/').pop() ?? path }),
+    (path: string, line?: number, name?: string) =>
+      open({
+        kind: 'file',
+        contentId: path,
+        title: name ?? path.split('/').pop() ?? path,
+        params: line === undefined ? undefined : { line },
+      }),
     [open],
   )
 
@@ -157,7 +166,13 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
       }
       if (!(event.ctrlKey || event.metaKey)) return
       const key = event.key.toLowerCase()
-      if (key === 'w' && activeTab !== undefined && activeProjectId !== null) {
+      if (key === 'p' && !event.shiftKey) {
+        event.preventDefault()
+        setQuickOpen(true)
+      } else if (key === 'f' && event.shiftKey) {
+        event.preventDefault()
+        open({ kind: 'search', contentId: 'search', title: t('tab.search') })
+      } else if (key === 'w' && activeTab !== undefined && activeProjectId !== null) {
         event.preventDefault()
         setLayout((prev) => closeTab(prev, activeProjectId, activeTab.id))
       } else if (key === 'b' && activeProjectId !== null) {
@@ -461,10 +476,33 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
   } else if (remote === undefined) {
     content = <div className="p-3 text-xs text-muted-foreground">host bridge unavailable</div>
   } else if (activeTab.kind === 'file') {
-    content = <FileView path={activeTab.contentId} sessionId={project?.sessionIds[0]} remote={remote} t={t} />
+    content = (
+      <FileView
+        path={activeTab.contentId}
+        sessionId={project?.sessionIds[0]}
+        remote={remote}
+        t={t}
+        line={typeof activeTab.params?.line === 'number' ? (activeTab.params.line as number) : undefined}
+      />
+    )
   } else if (activeTab.kind === 'explorer') {
     content = (
-      <ExplorerView root={project?.path ?? ''} sessionId={project?.sessionIds[0]} remote={remote} onOpen={openFile} t={t} />
+      <ExplorerView
+        root={project?.path ?? ''}
+        sessionId={project?.sessionIds[0]}
+        remote={remote}
+        onOpen={(path, name) => openFile(path, undefined, name)}
+        t={t}
+      />
+    )
+  } else if (activeTab.kind === 'search') {
+    content = (
+      <SearchView
+        root={project?.path ?? ''}
+        autoFocus
+        onOpen={(path, line) => openFile(path, line)}
+        t={t}
+      />
     )
   } else if (registry.get(activeTab.kind)?.render !== undefined) {
     content = registry.get(activeTab.kind)!.render!({ tab: activeTab })
@@ -479,6 +517,14 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
 
   return (
     <div className="workbench-root">
+      {quickOpen && (
+        <QuickOpen
+          root={project?.path ?? ''}
+          t={t}
+          onOpen={(path) => openFile(path)}
+          onClose={() => setQuickOpen(false)}
+        />
+      )}
       {sidebar}
       <div className="flex min-w-0 flex-1 flex-col">
         {tabStrip}

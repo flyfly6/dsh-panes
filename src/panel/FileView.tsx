@@ -12,6 +12,8 @@ interface Props {
   sessionId?: string
   remote: Remote
   t: Translate
+  /** 1-based line to reveal after the content renders (search hits, Ctrl+G). */
+  line?: number
 }
 
 type State =
@@ -20,12 +22,13 @@ type State =
   | { status: 'error'; message: string }
 
 /** Read-only source view: shiki highlighting, line gutter, wrap toggle, reload. */
-export function FileView({ path, sessionId, remote, t }: Props) {
+export function FileView({ path, sessionId, remote, t, line }: Props) {
   const [state, setState] = React.useState<State>({ status: 'loading' })
   const [wrap, setWrap] = React.useState(false)
   const [token, setToken] = React.useState(0)
   const [dark, setDark] = React.useState(isDark)
   const [html, setHtml] = React.useState<string | null>(null)
+  const container = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
     const root = document.documentElement
@@ -68,6 +71,15 @@ export function FileView({ path, sessionId, remote, t }: Props) {
     }
   }, [path, state, dark])
 
+  // Reveal the requested line once content is painted (search hit / jump to line).
+  React.useEffect(() => {
+    if (line === undefined || state.status !== 'ready') return
+    const target = container.current?.querySelectorAll('.line')[line - 1] as HTMLElement | undefined
+    target?.scrollIntoView({ block: 'center' })
+    target?.classList.add('wb-line-active')
+    return () => target?.classList.remove('wb-line-active')
+  }, [line, state, html])
+
   if (state.status === 'loading') {
     return <div className="grid h-full place-items-center text-xs text-muted-foreground">{t('file.loading')}</div>
   }
@@ -86,7 +98,7 @@ export function FileView({ path, sessionId, remote, t }: Props) {
   const rows = state.text.split('\n')
   return (
     <div className="flex h-full flex-col">
-      <div className="wb-scroll flex-1 overflow-auto">
+      <div ref={container} className="wb-scroll flex-1 overflow-auto">
         {html !== null ? (
           <div
             className={cn('wb-shiki', wrap && 'wb-code-wrap')}

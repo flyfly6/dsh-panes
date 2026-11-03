@@ -87,3 +87,7 @@
   color: var(--faint-foreground);
   user-select: none;
 }
+
+.workbench-root .wb-line-active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}

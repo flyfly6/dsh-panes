@@ -33,10 +33,11 @@
 
 ## 5. Search tab
 
-- [ ] 宿主 `search` op（`mode:'name'` 与 `mode:'content'`）：rg → 解析 `--json`；无 rg 回退 JS 扫描（并发 4、单文件 ≤2MiB、跳过二进制）。
-- [ ] 取消：`requestId` + 取消即 kill 子进程；输出上限 500 条 / 8MiB。
-- [ ] UI：查询条（Aa / .* / glob / 结果计数）+ 左侧分组结果（命中块高亮）+ 右侧预览（命中行高亮）；`Ctrl+Shift+F` 打开。
-- [ ] `Ctrl+P` 快速打开浮层（文件名模糊，上限 50）。
+- [x] 宿主 `search` op（`src/search.ts`）：`mode:'name'` 模糊打分 + `mode:'content'`（并发 4、单文件 ≤2MiB、跳过二进制与忽略目录、上限 500 条）；本机无 rg，直接走 JS 扫描回退。`test/search.test.mjs` 5 条。
+- [x] 取消：客户端 `AbortController` 每次输入即 abort 上一次请求（宿主为有预算的扫描，无需 kill 子进程）。
+- [x] UI：查询条（Aa / .* / 命中计数 / truncated 标注）+ 按文件分组命中 + 点击跳到文件并高亮该行；`Ctrl+Shift+F` 打开。
+- [x] `Ctrl+P` 快速打开浮层（文件名模糊，上限 50，↑↓/Enter）。
+- [~] glob 过滤：宿主已支持 `globs` 入参，UI 尚未暴露输入框。
 
 ## 6. 代码视图
 

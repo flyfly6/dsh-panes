@@ -12,6 +12,8 @@
  *
  * Lifecycle is owned by `ctx.effect`, so disabling the plugin removes the route.
  */
+import { search } from './search'
+
 export const name = 'dsh-workbench'
 export const inject = ['webServer']
 
@@ -90,6 +92,7 @@ export function createOps(readConfig: () => PluginConfig) {
   return {
     ping: () => ({ plugin: PLUGIN_ID, alive: true }),
     'config.get': () => readConfig(),
+    search: (args: Json) => search(args as any),
   } as Record<string, (args: Json) => unknown | Promise<unknown>>
 }
 

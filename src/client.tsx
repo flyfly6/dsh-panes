@@ -10,23 +10,10 @@ import { en, NS, zh } from './locale'
 import { createRegistry, WorkbenchPanel, type TabRegistry } from './panel/WorkbenchPanel'
 
 const PLUGIN_ID = 'dsh-workbench'
-const API = '/dsh-workbench/api'
 const PANEL_KEY = 'workbench'
 
 export const name = PLUGIN_ID
 export const inject = ['slots', 'layout', 'locale', 'workspaces', 'remote', 'remote.workspaceFiles'] as const
-
-/** Host ops used by the panel (search comes with §5). */
-export async function call(op: string, args: Record<string, unknown> = {}): Promise<any> {
-  const response = await fetch(API, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-dsh-plugin': PLUGIN_ID },
-    body: JSON.stringify({ op, args }),
-  })
-  const body = await response.json().catch(() => null)
-  if (!response.ok || body?.ok !== true) throw new Error(body?.message ?? `HTTP ${response.status}`)
-  return body.data
-}
 
 function installStyles(): () => void {
   const style = document.createElement('style')

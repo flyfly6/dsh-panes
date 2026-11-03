@@ -37,6 +37,14 @@ export const zh: Dict = {
   'explorer.empty': '空目录',
   'explorer.failed': '无法列目录',
   'common.notYet': '该 tab 类型将在后续阶段接入。',
+  'search.placeholder': '在项目内搜索内容…',
+  'search.case': '区分大小写',
+  'search.regex': '使用正则',
+  'search.searching': '搜索中…',
+  'search.noResults': '没有匹配',
+  'search.hits': '处命中',
+  'search.truncated': '结果已截断',
+  'quickOpen.placeholder': '按文件名跳转…',
 }
 
 export const en: Dict = {
@@ -72,4 +80,12 @@ export const en: Dict = {
   'explorer.empty': 'Empty directory',
   'explorer.failed': 'Could not list the directory',
   'common.notYet': 'This tab type arrives in a later phase.',
+  'search.placeholder': 'Search in project…',
+  'search.case': 'Match case',
+  'search.regex': 'Use regex',
+  'search.searching': 'Searching…',
+  'search.noResults': 'No matches',
+  'search.hits': 'hits',
+  'search.truncated': 'truncated',
+  'quickOpen.placeholder': 'Go to file by name…',
 }
