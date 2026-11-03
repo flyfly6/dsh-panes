@@ -1,0 +1,30 @@
+{
+  "id": "workspace-v02",
+  "name": "workspace-v02",
+  "title": "Workspace v0.2 — Monaco editing, LSP, side conversation",
+  "description": "Post-v1 iteration: make file tabs editable with a host-served Monaco (workers intact), add an opt-in LSP bridge for Monaco, and give the session tab a sidenote-style side conversation (forked side chat, quote and bring back).",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "flyfly6",
+  "assignee": "flyfly6",
+  "createdAt": "2026-11-03",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-03-monaco-editor",
+    "11-03-monaco-lsp",
+    "11-03-side-conversation"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
