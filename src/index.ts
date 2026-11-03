@@ -16,6 +16,7 @@ import { spawn } from 'node:child_process'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import * as gitHost from './git/host.js'
+import { createNotesOps } from './notes'
 import { search } from './search'
 
 export const name = 'dsh-workbench'
@@ -31,6 +32,21 @@ const BODY_LIMIT = 1 << 20
 
 type PluginConfig = Record<string, unknown>
 type Json = Record<string, unknown>
+
+/**
+ * Row config values arrive as schemastery *volatile refs* (an object with a
+ * `get()`), not plain values: the loader keeps them live so the settings page can
+ * swap them under a running plugin. Read through the ref; a plain value from an
+ * older host (or a test) passes straight through.
+ */
+export function plainConfig(config: PluginConfig): PluginConfig {
+  const out: PluginConfig = {}
+  for (const [key, value] of Object.entries(config)) {
+    const ref = value as { get?: () => unknown } | null
+    out[key] = ref !== null && typeof ref === 'object' && typeof ref.get === 'function' ? ref.get() : value
+  }
+  return out
+}
 
 export class ApiError extends Error {
   constructor(
@@ -96,7 +112,11 @@ function readJsonBody(req: any, limit = BODY_LIMIT): Promise<Json> {
 
 /** The op table. One entry per client-facing capability; args carry the rest. */
 export function createOps(readConfig: () => PluginConfig) {
+  const notes = createNotesOps(readConfig)
   return {
+    // Notes (T3): the vault lives outside every workspace, so the same note is
+    // reachable from all of them.
+    ...notes,
     ping: () => ({ plugin: PLUGIN_ID, alive: true }),
     'config.get': () => readConfig(),
     search: (args: Json, signal?: AbortSignal) => search({ ...(args as any), signal }),
@@ -151,6 +171,7 @@ export function createHandler(readConfig: () => PluginConfig) {
     try {
       sendJson(res, 200, { ok: true, data: await run(args, abort.signal) })
     } catch (error) {
+      // ApiError and NotesError share the shape (code / message / status).
       const failure = error as ApiError
       sendJson(res, failure.status ?? 500, {
         ok: false,
@@ -163,7 +184,7 @@ export function createHandler(readConfig: () => PluginConfig) {
 
 export function apply(ctx: any, config: PluginConfig = {}): void {
   ctx.effect(
-    () => ctx.webServer.register({ kind: 'prefix', path: ROUTE_PREFIX, handler: createHandler(() => config) }),
+    () => ctx.webServer.register({ kind: 'prefix', path: ROUTE_PREFIX, handler: createHandler(() => plainConfig(config)) }),
     'dsh-workbench: api route',
   )
   // T2: the forked Git half keeps upstream's route, guards and method table; it

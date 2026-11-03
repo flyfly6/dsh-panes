@@ -37,6 +37,8 @@ function build(schema: any): any {
     commitPrompt: live(schema.string().default('')),
     /** R2.10: push/pull/tag-push stay hidden and refused until this is on. */
     experimentalRemoteOps: live(schema.boolean().default(false)),
+    /** T3: the notes vault. Empty = `$DSH_HOME/notes`; any absolute directory. */
+    notesVaultPath: live(schema.string().default('')),
   }
   /* One switch per rail action, in rail order (RAIL_SPECS order in panel.js). */
   for (const id of RAIL_CONFIG_IDS) {

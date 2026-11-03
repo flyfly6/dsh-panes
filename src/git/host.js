@@ -2213,6 +2213,12 @@ export function configure(config) {
   rowConfig = config !== null && typeof config === 'object' ? config : {}
 }
 
+/* Volatile row-config values arrive as a ref with `get()` (the loader keeps them
+   live); plain values from an older host pass through. */
+function configValue(value) {
+  return value !== null && typeof value === 'object' && typeof value.get === 'function' ? value.get() : value
+}
+
 /** R2.10: remote writes are opt-in (`git.experimentalRemoteOps`). */
 const REMOTE_GATED = new Set([
   'push', 'pull', 'pushTags', 'branchDeleteRemote', 'tagDeleteRemote', 'remoteAdd', 'remoteRemove',
@@ -2221,7 +2227,7 @@ const REMOTE_GATED = new Set([
 function assertRemoteOpsAllowed(method, payload) {
   const remote = REMOTE_GATED.has(method) === true || (method === 'commit' && payload !== null && typeof payload === 'object' && payload.push === true)
   if (remote !== true) return
-  if (rowConfig.experimentalRemoteOps === true) return
+  if (configValue(rowConfig.experimentalRemoteOps) === true) return
   throw new PanelError('disabled-by-config', 'remote operations are disabled; enable them in the workbench Git settings', 403)
 }
 

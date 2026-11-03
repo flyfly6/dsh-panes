@@ -3,6 +3,15 @@
 const PLUGIN_ID = 'dsh-workbench'
 const API = '/dsh-workbench/api'
 
+/** A host refusal, with the op's own code kept (callers branch on it). */
+export class ApiCallError extends Error {
+  code: string
+  constructor(code: string, message: string) {
+    super(message)
+    this.code = code
+  }
+}
+
 export async function call<T = any>(op: string, args: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
   const response = await fetch(API, {
     method: 'POST',
@@ -12,7 +21,7 @@ export async function call<T = any>(op: string, args: Record<string, unknown> = 
   })
   const body = await response.json().catch(() => null)
   if (!response.ok || body?.ok !== true) {
-    throw new Error(body?.message ?? `HTTP ${response.status}`)
+    throw new ApiCallError(String(body?.code ?? `http/${response.status}`), body?.message ?? `HTTP ${response.status}`)
   }
   return body.data as T
 }
