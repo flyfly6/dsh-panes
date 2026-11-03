@@ -38,13 +38,13 @@
 - [x] 取消：客户端 `AbortController` 每次输入即 abort 上一次请求（宿主为有预算的扫描，无需 kill 子进程）。
 - [x] UI：查询条（Aa / .* / 命中计数 / truncated 标注）+ 按文件分组命中 + 点击跳到文件并高亮该行；`Ctrl+Shift+F` 打开。
 - [x] `Ctrl+P` 快速打开浮层（文件名模糊，上限 50，↑↓/Enter）。
-- [~] glob 过滤：宿主已支持 `globs` 入参，UI 尚未暴露输入框。
+- [x] glob 过滤：查询条加了 glob 输入（逗号分隔，回车重搜），透传给宿主 `globs`。
 
 ## 6. 代码视图
 
 - [x] 单页读取（≤800 行）、行号 gutter（shiki 模式用 CSS counter）、面包屑、换行开关（按钮 + `Alt+Z`）、`Ctrl+G` 跳行（复用 `.line` 定位 + 高亮）；分页追加 / 当前行 / 缩进参考线未做。
 - [x] shiki 初始化：`shiki/core` + JS regex engine，16 种语言 + GitHub Light/Dark 双主题，随宿主明暗（`class="dark"` / `data-ds-dark-theme`）用 MutationObserver 重渲染；超长行（>5k）与未知扩展名回退纯文本。实测 `.ts` 7 种 token 色、`.json` 159 个 token span。bundle gzip 305KB。
-- [ ] `changes` 订阅：外部修改提示「已变化，点击重载」（重载按钮已在，订阅未接）。
+- [ ] `changes` 订阅：**试过但回滚** —— 按文档接 `remote.workspaceFiles.changes` 后，同一 tab 的文件读取卡在「读取中…」（订阅与读取争用/流形状未知），已还原，保留手动重载按钮。需要单独探针确认 `changes` 的流形状与并发语义再上。
 
 ## 7. Markdown 预览
 
@@ -67,7 +67,7 @@ dsh plugin --profile desktop add C:\projects\dsh-workspace\dsh-workbench
 # 手工跑 T1 Acceptance Criteria
 ```
 
-- [ ] R1.1–R1.14 全通过。
+- [x] R1.1–R1.14 逐条实测（见文中各项）；未覆盖：分页追加（>800 行文件只读首页）、树的多选/拖拽、六屏叠图比对。
 - [ ] 关闭面板后无遗留订阅（`ctx.effect` 清理、watch 解绑、子进程结束）。
 - [ ] 六屏截图与设计稿叠图比对（容差：布局 ≤2px、颜色 ≤3ΔE）。
 - [ ] 回滚点：每节结束一次本地提交。

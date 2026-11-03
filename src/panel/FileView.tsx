@@ -62,6 +62,7 @@ export function FileView({ path, sessionId, remote, t, line }: Props) {
     }
   }, [path, sessionId, remote, token, t])
 
+
   React.useEffect(() => {
     if (state.status !== 'ready') return
     let live = true

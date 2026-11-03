@@ -18,6 +18,7 @@ export function SearchView({ root, onOpen, t, autoFocus }: Props) {
   const [query, setQuery] = React.useState('')
   const [regex, setRegex] = React.useState(false)
   const [caseSensitive, setCaseSensitive] = React.useState(false)
+  const [globs, setGlobs] = React.useState('')
   const [result, setResult] = React.useState<SearchResult<ContentHit> | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState('')
@@ -36,7 +37,12 @@ export function SearchView({ root, onOpen, t, autoFocus }: Props) {
       abort.current = controller
       setBusy(true)
       setError('')
-      call<SearchResult<ContentHit>>('search', { root, mode: 'content', query: value, regex, caseSensitive }, controller.signal)
+      const patterns = globs.split(',').map((glob) => glob.trim()).filter((glob) => glob !== '')
+      call<SearchResult<ContentHit>>(
+        'search',
+        { root, mode: 'content', query: value, regex, caseSensitive, globs: patterns },
+        controller.signal,
+      )
         .then((data) => {
           setResult(data)
           setBusy(false)
@@ -47,7 +53,7 @@ export function SearchView({ root, onOpen, t, autoFocus }: Props) {
           setBusy(false)
         })
     },
-    [caseSensitive, regex, root],
+    [caseSensitive, globs, regex, root],
   )
 
   const grouped = React.useMemo(() => {
@@ -89,6 +95,13 @@ export function SearchView({ root, onOpen, t, autoFocus }: Props) {
         >
           <CaseSensitive className="h-3.5 w-3.5" aria-hidden />
         </Button>
+        <Input
+          className="max-w-[180px]"
+          placeholder={t('search.globs')}
+          value={globs}
+          onChange={(event) => setGlobs(event.target.value)}
+          onKeyDown={(event) => event.key === 'Enter' && run(query)}
+        />
         <Button
           variant={regex ? 'outline' : 'ghost'}
           size="icon"
