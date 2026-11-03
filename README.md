@@ -76,3 +76,5 @@ profile needs a client restart to be composed into the boot graph.
 - Git `push` / `pull` stay hidden by default (see the task design, D3).
 - `shiki` and `@xterm/*` are not in the host's shared module table, so they must
   be bundled into `lib/client.js` (probe: 2026-11-03).
+- Search uses the machine's `rg` first, then the `rg` bundled via `@vscode/ripgrep`,
+  then a bounded JS walk. The response says which engine ran (`engine`).

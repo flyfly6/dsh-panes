@@ -7,7 +7,8 @@ import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { search, searchByName, searchInContent } from '../src/search.ts'
+import { spawnSync } from 'node:child_process'
+import { search, searchByName, searchInContent } from '../lib/search.js'
 
 let root
 
@@ -23,6 +24,36 @@ before(async () => {
 })
 
 after(() => rm(root, { recursive: true, force: true }))
+
+test('search prefers ripgrep when it is installed', async () => {
+  const { engine } = await searchInContent({ root, query: 'alpha', mode: 'content' })
+  assert.ok(engine === 'system-rg' || engine === 'bundled-rg', `expected rg, got ${engine}`)
+  const forced = await searchInContent({ root, query: 'alpha', mode: 'content', engine: 'js' })
+  assert.equal(forced.engine, 'js')
+  assert.deepEqual(
+    forced.hits.map((hit) => [hit.path, hit.line]).sort(),
+    (await searchInContent({ root, query: 'alpha', mode: 'content' })).hits
+      .map((hit) => [hit.path, hit.line])
+      .sort(),
+  )
+})
+
+test('with no rg on PATH the bundled binary takes over', () => {
+  // A child process, because the engine probe caches PATH lookups per process.
+  const script = `
+    import { searchInContent } from ${JSON.stringify(new URL('../lib/search.js', import.meta.url).href)}
+    const report = await searchInContent({ root: ${JSON.stringify(root)}, query: 'alpha', mode: 'content' })
+    console.log(report.engine, report.hits.length)
+  `
+  const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+    env: { ...process.env, PATH: '/nonexistent' },
+    encoding: 'utf8',
+  })
+  assert.equal(run.status, 0, run.stderr)
+  const [engine, hits] = run.stdout.trim().split(' ')
+  assert.equal(engine, 'bundled-rg')
+  assert.ok(Number(hits) > 0)
+})
 
 test('name search is fuzzy, skips ignored directories and ranks the plain name first', async () => {
   const fuzzy = await searchByName({ root, query: 'appts', mode: 'name' })

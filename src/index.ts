@@ -92,13 +92,16 @@ export function createOps(readConfig: () => PluginConfig) {
   return {
     ping: () => ({ plugin: PLUGIN_ID, alive: true }),
     'config.get': () => readConfig(),
-    search: (args: Json) => search(args as any),
-  } as Record<string, (args: Json) => unknown | Promise<unknown>>
+    search: (args: Json, signal?: AbortSignal) => search({ ...(args as any), signal }),
+  } as Record<string, (args: Json, signal?: AbortSignal) => unknown | Promise<unknown>>
 }
 
 export function createHandler(readConfig: () => PluginConfig) {
   const ops = createOps(readConfig)
   return async function handle(req: any, res: any): Promise<void> {
+    // An aborted client request must stop a long rg scan: the signal reaches the child.
+    const abort = new AbortController()
+    res.on?.('close', () => abort.abort())
     if (!isTrusted(req) || headerOf(req, PLUGIN_HEADER) !== PLUGIN_ID) {
       sendJson(res, 403, { ok: false, code: 'forbidden', message: 'request is not from the plugin page' })
       return
@@ -124,7 +127,7 @@ export function createHandler(readConfig: () => PluginConfig) {
       return
     }
     try {
-      sendJson(res, 200, { ok: true, data: await run(args) })
+      sendJson(res, 200, { ok: true, data: await run(args, abort.signal) })
     } catch (error) {
       const failure = error as ApiError
       sendJson(res, failure.status ?? 500, {

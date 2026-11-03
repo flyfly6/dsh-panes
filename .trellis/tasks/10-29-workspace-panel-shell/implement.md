@@ -33,7 +33,7 @@
 
 ## 5. Search tab
 
-- [x] 宿主 `search` op（`src/search.ts`）：`mode:'name'` 模糊打分 + `mode:'content'`（并发 4、单文件 ≤2MiB、跳过二进制与忽略目录、上限 500 条）；本机无 rg，直接走 JS 扫描回退。`test/search.test.mjs` 5 条。
+- [x] 宿主 `search` op（`src/search.ts`）：**引擎优先级 = 本机 rg → 内置 rg（`@vscode/ripgrep`，随包安装）→ JS 扫描回退**；`mode:'name'`（rg `--files` + 模糊打分）/ `mode:'content'`（rg `--json` 解析 + 字节偏移转列）；统一预算：忽略目录、单文件 ≤2MiB、500 条、4 并发（JS 路径）。`test/search.test.mjs` 7 条（含无 PATH rg 时走内置二进制、rg 与 JS 结果一致）。
 - [x] 取消：客户端 `AbortController` 每次输入即 abort 上一次请求（宿主为有预算的扫描，无需 kill 子进程）。
 - [x] UI：查询条（Aa / .* / 命中计数 / truncated 标注）+ 按文件分组命中 + 点击跳到文件并高亮该行；`Ctrl+Shift+F` 打开。
 - [x] `Ctrl+P` 快速打开浮层（文件名模糊，上限 50，↑↓/Enter）。

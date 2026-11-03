@@ -11,7 +11,7 @@ import { defineConfig } from 'tsdown'
  */
 export default defineConfig([
   {
-    entry: ['src/index.ts'],
+    entry: ['src/index.ts', 'src/search.ts'],
     outDir: 'lib',
     format: 'esm',
     platform: 'neutral',
