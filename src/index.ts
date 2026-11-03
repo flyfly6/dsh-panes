@@ -15,10 +15,14 @@
 import { spawn } from 'node:child_process'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
+import * as gitHost from './git/host.js'
 import { search } from './search'
 
 export const name = 'dsh-workbench'
 export const inject = ['webServer']
+
+/* The row config schema (own fields + the forked Git settings). */
+export { Config } from './config'
 
 const ROUTE_PREFIX = '/dsh-workbench/api'
 const PLUGIN_HEADER = 'x-dsh-plugin'
@@ -158,10 +162,20 @@ export function createHandler(readConfig: () => PluginConfig) {
 }
 
 export function apply(ctx: any, config: PluginConfig = {}): void {
-  // ponytail: config is a plain object until the settings page lands (T1 §2.0f);
-  // swap for a schemastery `Config` export when the config slot is wired.
   ctx.effect(
     () => ctx.webServer.register({ kind: 'prefix', path: ROUTE_PREFIX, handler: createHandler(() => config) }),
     'dsh-workbench: api route',
   )
+  // T2: the forked Git half keeps upstream's route, guards and method table; it
+  // is mounted as a child fiber so disabling this plugin tears both down.
+  ctx.effect(() => {
+    const fiber: any = ctx.plugin(gitHost, config)
+    return () => {
+      try {
+        void fiber?.dispose?.()
+      } catch {
+        /* already gone */
+      }
+    }
+  }, 'dsh-workbench: git routes')
 }
