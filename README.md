@@ -38,7 +38,7 @@ Uninstall: remove it from `dsh.profile.bundles` and run
 | `src/index.ts` | Host half: cordis plugin, `POST /dsh-workbench/api` route. |
 | `src/ui/` | shadcn primitives (button, input, dropdown-menu) + `cn()`. |
 | `src/panel/` | Panel shell, file/explorer/search/Markdown/terminal/browser views, shared types. |
-| `src/git/` | Git tool window, forked from `dsh-ide-git` v0.21.1 (MIT): `host.js` (routes + guards), `panel.js` (UI), `tab.tsx`/`status.ts` (adapter), `UPSTREAM.md`. |
+| `src/git/` | Git tool window, forked from `dsh-ide-git` v0.21.1 (MIT) and **maintained here** (no upstream sync since 2026-11-03): `host.js` (routes + guards), `panel.js` (UI), `tab.tsx`/`status.ts` (adapter), `UPSTREAM.md`. |
 | `src/notes.ts` | Notes vault (host): `notes.*` ops, path fence, atomic writes with etags, frontmatter preservation, `.trash`. |
 | `src/notes/` | Notes UI: the list tab and the BlockNote editor (lazy-loaded). |
 | `src/config.ts` | Row config schema (startup, Git rail switches, AI commit message, `experimentalRemoteOps`, `notesVaultPath`). |
@@ -94,9 +94,12 @@ profile needs a client restart to be composed into the boot graph.
 - Git `push` / `pull` stay hidden by default (D3): the buttons are absent until
   `experimentalRemoteOps` is on in the plugin settings, and the host refuses those
   methods (`disabled-by-config`) while it is off.
-- The Git panel is a fork: before touching `src/git/panel.js` read
-  `src/git/UPSTREAM.md` — our edits are `[workbench-fork]`-marked hunks that a
-  re-sync has to re-apply.
+- The Git panel is **our own baseline now**: forked from `dsh-ide-git` v0.21.1
+  (MIT) and no longer synced with upstream (decision 2026-11-03). Edit it like
+  our own code — `src/git/UPSTREAM.md` records provenance and the change log.
+  The panel is still upstream's compiled JS with its own `dig-` styling; pulling
+  it onto the workbench's tokens (and, where a restyle cannot reach, rebuilding
+  blocks in TSX) is planned as T6 in the v0.2 plan.
 - The Git status bar/badge call `summary` with `stats: false` (no `--numstat`
   passes); it shows `±n` changed files, not added/removed line counts.
 - Notes live outside every workspace: `$DSH_HOME/notes` by default, or any

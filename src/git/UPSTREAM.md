@@ -1,5 +1,9 @@
 # Upstream: dsh-ide-git
 
+**Status (2026-11-03): 分叉维护中 — 不再同步上游。** 这棵树是 `dsh-workbench`
+自己的 Git 面板基线；此文件只记录**来源、署名与我们的变更**。样式对齐与按需重构见
+`.trellis/tasks/11-03-git-tab-native/prd.md`（T6）。
+
 We forked **[KannaKuron/dsh-ide-git](https://github.com/KannaKuron/dsh-ide-git)** v0.21.1
 (MIT — see `LICENSE`, which is upstream's file, unmodified) into `src/git/`.
 
@@ -10,7 +14,8 @@ We forked **[KannaKuron/dsh-ide-git](https://github.com/KannaKuron/dsh-ide-git)*
 | `src/git/LICENSE` | `LICENSE` | upstream MIT text |
 
 Sync baseline: tag `v0.21.1`, upstream files copied verbatim, then the edits below.
-Everything we changed is marked `[workbench-fork]` in place and is listed here.
+The edits made *while this was still a fork* are marked `[workbench-fork]` in place;
+since 2026-11-03 the tree is ours, so new changes are recorded here only.
 
 ## Host half (`src/git/host.js`)
 
@@ -66,27 +71,27 @@ Everything we changed is marked `[workbench-fork]` in place and is listed here.
 - `src/git/panel.d.ts` / `src/git/host.d.ts` — hand-written types for the two
   vendored files; typecheck never sees upstream's JS.
 
-## Syncing a new upstream version
+## 所有权：这棵树现在是我们的
+
+不再有「同步上游」流程。规则只有三条：
+
+1. **直接改**。`src/git/panel.js` / `src/git/host.js` 是普通源文件，改样式、抽组件、删代码都不需要再留 `[workbench-fork]` 标记——整棵树都是我们的。
+2. **改完记一条**。新增/移除的能力、行为变化，追加到上面的变更表；`NOTICE.md` 与 `LICENSE` 不动（MIT 署名）。
+3. **上游只当参考**。若某个上游修复确实需要，按「读上游 diff → 手工移植到我们这棵树 → 上面记一条」处理，**不要**重放整套补丁，也不要把文件换回上游版本。
+
+### 每次改动后跑什么
 
 ```bash
-git clone --depth 1 --branch <tag> https://github.com/KannaKuron/dsh-ide-git /tmp/dsh-ide-git
-# 1. re-copy both halves, then 2. re-apply the edits above
-cp /tmp/dsh-ide-git/src/index.js src/git/host.js
-cp /tmp/dsh-ide-git/src/client.js src/git/panel.js
-cp /tmp/dsh-ide-git/LICENSE src/git/LICENSE
-diff -u /tmp/dsh-ide-git/src/index.js src/git/host.js | head -100   # expect only §Host entries
+node --check src/git/panel.js        # 单文件脚本仍需可解析
+pnpm check                          # build + typecheck + node --test
 ```
 
-The wrapper rename and the seat deletions are mechanical; the host edits are
-four hunks. Re-run, in order:
+GUI 冒烟（T2 的验收清单，任何一次面板改动都跑一遍）：
 
-1. `node --check src/git/panel.js` — the file has to stay parseable JS.
-2. `grep -c '\[workbench-fork\]' src/git/*.js` — every edit still marked.
-3. `pnpm check` — build (the panel must still bundle), typecheck, tests
-   (`test/git.test.mjs` covers the trust fence, the config gate, summary and the
-   empty-repository paths).
-4. In the GUI: open the `git` tab on a repo with changes, stage → unstage,
-   double-click a file for the diff, and toggle 插件 → dsh-workbench → 远程操作.
+1. 打开 `git` tab：分支树、提交列表、变更分组、提交框同屏。
+2. stage → unstage → 双击改动文件看 diff。
+3. 设置页：动作条分组、远程操作开关（关 → push/pull 三处都不出现，宿主 403）。
+4. 空仓库（`git init` 无提交）与非仓库目录各开一次，只出可读错误。
 
 ## Known upstream behaviour we did not change
 

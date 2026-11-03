@@ -10,8 +10,9 @@ the package (`src/git/LICENSE`) and its fork notes live in `src/git/UPSTREAM.md`
 - Files: `src/git/host.js` (from `src/index.js`), `src/git/panel.js` (from `src/client.js`)
 - License: MIT — Copyright (c) the dsh-ide-git authors. Full text: `src/git/LICENSE`.
 - Changes: see `src/git/UPSTREAM.md` (seat registrations removed, row config moved,
-  push/pull config gate, empty-repository handling). Every edit is marked
-  `[workbench-fork]` in place.
+  push/pull config gate, empty-repository handling). This copy has **diverged**:
+  since 2026-11-03 it is maintained as part of this package and is no longer
+  synced with upstream.
 
 Anything else in this package is original: the workbench panel, tab model, file
 and search views, conversation/terminal embedding and the host API.
