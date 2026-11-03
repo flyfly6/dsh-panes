@@ -6,6 +6,11 @@
 
 父任务：`10-29-workbench-plugin`（宿主路由与安全约定见父任务 `design.md`；设计稿 `lgBsZ` / 深色 `AfEbo`）。依赖 T1 的 `workbenchTabs` 注册契约。
 
+## 实现前必须决
+
+- 编辑器：**BlockNote**（用户指定，`@blocknote/shadcn`；只读态 `isEditable=false`）。
+- 存储：BlockNote 的 markdown 导入/导出是 lossy（官方口径），无损需存 Block JSON，而 D4 要求「一条笔记一个 `.md`」。需在开工前选：(a) `.md` 为唯一正本、笔记只用受支持子集（推荐）；(b) 存 Block JSON；(c) `.md` + `.blocks.json` 缓存。
+
 ## Requirements
 
 - **R3.1 笔记库定位与配置**：默认 `$DSH_HOME/notes`（不存在则首次使用时创建）；设置里可改为任意绝对目录（含 Obsidian 库）；路径校验拒绝相对路径与符号链接逃逸；切换库后列表与已打开 tab 需明确提示（不静默丢内容）。

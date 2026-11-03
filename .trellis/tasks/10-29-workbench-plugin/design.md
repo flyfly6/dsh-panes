@@ -415,6 +415,20 @@ const Conversation = require('@deepseek-ai/dsh-client-ui-conversation')
 - **search**：优先用 `@vscode/ripgrep` 的二进制（`--json --max-count --glob --hidden=false`）；不可用时回退 JS 遍历 + `fs.read`（限并发 4、限文件大小 2 MiB、跳过二进制）。结果流式分片返回，客户端 `AbortController` 取消即终止子进程。
 - **notes**：`.md` 文件 + frontmatter（`gray-matter` 或自写极简解析，避免额外依赖树）；写入走原子写（临时文件 + rename）；`write` 前比较 mtime/etag，冲突时返回 `conflict` 让客户端提示覆盖/重载。
 
+## 3.3b 笔记编辑器选型（BlockNote）与 Markdown 预览的边界
+
+用户指定 T3 的 Notion 式编辑器用 [BlockNote](https://github.com/TypeCellOS/BlockNote)（MPL-2.0，ProseMirror/Tiptap 之上）。实测与结论（2026-11-03）：
+
+| 项 | 事实 |
+|---|---|
+| 只读复用 | 可行：`editor.isEditable = false`，用 `@blocknote/shadcn` 与现有 Tailwind/shadcn 工具链同栈 |
+| 体积 | 只读 `BlockNoteView`（core + react + shadcn，react 外置）打包 **4.15 MB raw / 894 KB gzip**；当前整包 406 KB gzip |
+| Markdown 能力 | 官方自述解析器是 **minimal + lossy**（CommonMark + GFM 基础子集），更丰富的 markdown 官方建议「先用 markdown-it/marked 解析成 HTML，再 `tryParseHTMLToBlocks`」 |
+
+- **仓库文件预览继续用 markdown-it**（已实现，40KB 量级，GFM 覆盖更全、DOMPurify 消毒后直接出 HTML）；BlockNote 只出现在笔记 tab。
+- 视觉一致靠样式层：`.wb-markdown` 的排版规则同样作用于 BlockNote 只读态，不追求同一渲染器。
+- **存储待定（T3 前必须决）**：BlockNote 的 markdown 导入/导出均 lossy，无损要求存 Block JSON；而 D4 定义「一条笔记一个 `.md`」。三个选项：(a) 存 `.md`、只用受支持子集（推荐）；(b) 存 Block JSON（偏离 D4）；(c) `.md` 为正本 + `.blocks.json` 缓存。
+
 ## 3.4 Git 半（fork 自 dsh-ide-git，MIT）
 
 来源与边界：`https://github.com/KannaKuron/dsh-ide-git` v0.21.1（MIT）。**整体 vendor 进 `src/git/`**，只做接入改造，不重写面板与 git 逻辑。
