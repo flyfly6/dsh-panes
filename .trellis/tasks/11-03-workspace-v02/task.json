@@ -21,7 +21,8 @@
   "children": [
     "11-03-monaco-editor",
     "11-03-monaco-lsp",
-    "11-03-side-conversation"
+    "11-03-side-conversation",
+    "11-03-session-restore"
   ],
   "parent": null,
   "relatedFiles": [],

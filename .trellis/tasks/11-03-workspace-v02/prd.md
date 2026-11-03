@@ -10,6 +10,7 @@
 1. **file tab 可编辑**：引入 **Monaco**，但不把它打进 `client.js` —— 由宿主半边把 `monaco-editor` 的 AMD 产物当静态资源发出去，客户端按需用 `<script>` 加载。顺带补上宿主侧第一个文件写入口（原子写 + 版本冲突）。
 2. **可选 LSP**：默认关闭。关闭时用 Monaco 自带的 TS/JSON/CSS/HTML worker 就够；打开后由宿主按语言拉起真实 language server，编辑器获得 hover / 定义跳转 / 诊断 / 补全。
 3. **会话 tab 的侧栏会话**：对齐 [dsh-sidenote](https://github.com/g-yixuan/dsh-sidenote) 的核心体验 —— 在当前会话旁边开侧聊（继承历史、独立多轮），划选引用，结论带回主对话。
+4. **启动恢复**：应用重启后回到上次离开的工作台 —— 项目、全部 tab、活动 tab、侧栏状态一个不少；布局不再绑在 `localStorage` 的 origin 上。
 
 ## Background — v1 已确认的事实（来自 T1/T2/T3 的实测，不是猜测）
 
@@ -36,6 +37,7 @@
 | T1 `11-03-monaco-editor` | 宿主静态路由 + `file.write` + Monaco 懒加载 + 编辑/保存/冲突 UX；bundle 不增重 | 无（定义 vendor 路由与写入口契约） |
 | T2 `11-03-monaco-lsp` | LSP 管理器（宿主）+ 传输层 + Monaco 诊断/跳转；设置项 `lsp.*` | 依赖 T1 的编辑态与 Monaco 实例 |
 | T3 `11-03-side-conversation` | 会话 tab 右侧侧聊：fork/多标签/引用/回流/持久化 | 依赖 v1 的 conversation child slot；需先探 `ctx.sessions` 的 fork 能力 |
+| T4 `11-03-session-restore` | 启动恢复全部 tab：宿主侧布局文件 + 分类型恢复策略 + 开关 | 无（只依赖一次宿主读写；可最先发版） |
 
 ## Requirements（跨子任务）
 
@@ -72,6 +74,6 @@
 
 ## 发布切分
 
-1. **v0.2.0** = T1（可编辑）。
+1. **v0.2.0** = T4（启动恢复）+ T1（可编辑）—— 两块互不依赖，T4 可以先合。
 2. **v0.2.1** = T2（LSP，开关默认关）。
 3. **v0.3.0** = T3（侧栏会话）—— 取决于 S4/S5 的探测结果，必要时先发「独立会话侧聊」版本。

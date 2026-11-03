@@ -71,6 +71,20 @@ ctx.webServer.register({
 
 一个 `(root, language)` 一个 server；空闲 10 分钟回收；`ctx.effect` 的 disposer 里全部 kill。
 
+### 3.3 `layout.get` / `layout.set`（T4）
+
+```jsonc
+{ "op": "layout.get" }
+// → { layout, schemaVersion: 3, savedAt: 1730…, origin: "host" }
+{ "op": "layout.set", "args": { "layout": { … }, "savedAt": 1730… } }
+// → { savedAt, bytes }
+```
+
+- 文件：`$DSH_HOME/workbench/layout.json`（`layout.json.bak` 留上一版，解析失败另存 `layout.json.bad-<ts>` 且不覆盖）。
+- 原子写（temp + rename）；上限 256 KB，超出先裁 `closed` 栈、再裁非活动项目的非活动 tab，响应里带 `trimmed: true`。
+- 迁移：客户端首次发现宿主没有布局时，把 `localStorage` 的 `schemaVersion 2` 布局 `set` 上去，成功后清 key。
+- 写入者约定：单写入者、最后写入者赢；`savedAt` 只用于识别「磁盘比内存新」的那一次提示。
+
 ## 4. 客户端结构增量
 
 ```
