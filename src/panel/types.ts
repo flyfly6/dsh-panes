@@ -58,5 +58,7 @@ export interface PanelProps {
   useWorkspaces: (selector: (snapshot: { items: any[] }) => unknown) => any
   remote?: Remote
   apps?: { key: string; label: string }[]
+  /** Host call: retain a Session reference for an embedded conversation occurrence. */
+  retainSession?: (sessionId: string) => { sessionId: string; release(): void }
   openPanel?: (key: string) => void
 }

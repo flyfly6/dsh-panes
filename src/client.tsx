@@ -7,13 +7,14 @@
  */
 import styles from './generated/styles'
 import { en, NS, zh } from './locale'
+import { ConversationSlot } from './panel/ConversationSlot'
 import { createRegistry, WorkbenchPanel, type TabRegistry } from './panel/WorkbenchPanel'
 
 const PLUGIN_ID = 'dsh-workbench'
 const PANEL_KEY = 'workbench'
 
 export const name = PLUGIN_ID
-export const inject = ['slots', 'layout', 'locale', 'workspaces', 'remote', 'remote.workspaceFiles'] as const
+export const inject = ['slots', 'layout', 'locale', 'workspaces', 'sessions', 'remote', 'remote.workspaceFiles'] as const
 
 function installStyles(): () => void {
   const style = document.createElement('style')
@@ -74,10 +75,12 @@ export function apply(ctx: any, config: { startup?: string } = {}): void {
             name: 'main',
             key: PANEL_KEY,
             locale: NS,
+            children: { 'workbench.conversation': { kind: 'single', scope: 'session' } },
             inject: () => ({
               t,
               close,
               remote: ctx.remote,
+              retainSession: (sessionId: string) => ctx.sessions.retain(sessionId, { source: 'workbench' }),
               apps: apps(),
               openPanel: (key: string) => ctx.layout.selectPanel(key),
               registry,
@@ -87,6 +90,12 @@ export function apply(ctx: any, config: { startup?: string } = {}): void {
         ),
       ),
     'dsh-workbench: workbench panel',
+  )
+
+  // Embedded Session tab body: the host conversation factory inside the slot's provider.
+  ctx.effect(
+    () => ctx.slots.inject('workbench.conversation', () => ctx.slots.register({ name: 'workbench.conversation' }, ConversationSlot)),
+    'dsh-workbench: session conversation',
   )
 
   ctx.effect(

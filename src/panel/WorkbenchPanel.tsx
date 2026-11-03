@@ -47,6 +47,7 @@ import { ExplorerView } from './ExplorerView'
 import { FileView } from './FileView'
 import { BrowserView } from './BrowserView'
 import { SessionCard } from './SessionCard'
+import { Guarded } from './Guarded'
 import { MarkdownView } from './MarkdownView'
 import { QuickOpen } from './QuickOpen'
 import { SearchView } from './SearchView'
@@ -104,6 +105,23 @@ function projectsOf(items: unknown): Project[] {
     path: String(item.path ?? ''),
     sessionIds: Array.isArray(item.sessionIds) ? item.sessionIds.map(String) : [],
   }))
+}
+
+/** Retains a Session reference for as long as the tab lives, then releases it. */
+function EmbeddedConversation({
+  sessionId,
+  SessionProvider,
+  renderSlot,
+  retainSession,
+}: {
+  sessionId: string
+  SessionProvider: React.ComponentType<any>
+  renderSlot: (key: string, owner: unknown) => React.ReactNode
+  retainSession: (sessionId: string) => { sessionId: string; release(): void }
+}) {
+  const reference = React.useMemo(() => retainSession(sessionId), [retainSession, sessionId])
+  React.useEffect(() => () => reference.release(), [reference])
+  return <SessionProvider session={reference}>{renderSlot('workbench.conversation', {})}</SessionProvider>
 }
 
 export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
@@ -514,7 +532,19 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
       />
     )
   } else if (activeTab.kind === 'session') {
-    content = <SessionCard sessionId={activeTab.contentId} onOpen={close} t={t} />
+    content =
+      (props as any).SessionProvider !== undefined && (props as any).renderSlot !== undefined && props.retainSession !== undefined ? (
+        <Guarded fallback={<SessionCard sessionId={activeTab.contentId} onOpen={close} t={t} />}>
+          <EmbeddedConversation
+            sessionId={activeTab.contentId}
+            SessionProvider={(props as any).SessionProvider}
+            renderSlot={(props as any).renderSlot}
+            retainSession={props.retainSession}
+          />
+        </Guarded>
+      ) : (
+        <SessionCard sessionId={activeTab.contentId} onOpen={close} t={t} />
+      )
   } else if (activeTab.kind === 'browser') {
     content = (
       <BrowserView
