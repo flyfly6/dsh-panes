@@ -6,7 +6,8 @@
 
 - [x] `lib/client.js`：ModuleLoader 工厂 + locale 注册 + `ctx.slots.inject('main', …)` 注册 `main` 面板（key `workbench`）+ `sidebar.panellist` 入口行。
 - [x] 骨架：`Sidebar | (TabBar / Breadcrumb / Content) / StatusBar`，处理 `--dsh-frame-top-clearance`。
-- [ ] 启动进入：`config.startup === 'workspace'`（默认）时 layout ready 后 `selectPanel('workbench')`，并收起 dsh 左栏（S10 结论决定是否可程序化）。
+- [x] 启动进入：`config.startup`（默认 `'workspace'`）时 300ms 后 `ctx.layout.selectPanel('workbench')`；`'conversation'` 关闭该行为。实测刷新即落在工作台。
+- [x] **S10 结论：客户端 `ctx.layout` 只有 `panels / hasMainPanel / panelInfo / navigation`，没有 `toggleSidebar`** → 不做程序化收起，dsh 左栏保持（面板自带「返回会话」按钮），即 design 的回退分支。
 - [x] 返回：`selectPanel(null)`；`Esc` 仅在面板聚焦且无弹层时生效（左栏恢复随上一项一起做）。
 - [x] 验证：安装 → dsh 左栏出现入口 → 打开即进入 → 控制台无报错（S1）。
 
@@ -28,7 +29,7 @@
 ## 4. Explorer tab
 
 - [x] 树：懒加载 `workspaceFiles.list`（`remote.workspaceFiles` 客户端接口）；折叠状态仅内存、忽略目录与类型图标未做。
-- [ ] 右键菜单：打开 / 在树中定位 / 复制路径 / 在系统打开。
+- [x] 右键菜单：打开 / 复制路径（实测两项均出现）；「在树中定位」「在系统打开」待补（后者需宿主 op）。
 - [x] 单击打开 file tab（幂等，实测连点两次仍是一个 tab）。
 
 ## 5. Search tab
@@ -56,7 +57,7 @@
 
 - [ ] 会话：`SessionProvider` + 宿主 `Conversation.View`；先按 S9 结论决定「双实例」还是「portal 换宿主」。
 - [ ] 终端：复用 terminal controller（list → attach → 读写）；关闭调终止；不可用降级为跳转按钮。
-- [ ] 浏览器：iframe + 自管历史 + 地址栏；URL 只允许 http/https。
+- [x] 浏览器：iframe + 自管历史（后退/前进/刷新）+ 地址栏；非 http(s) 自动补 `https://`，非法输入不导航；`sandbox` + `referrerPolicy`；底部固定「部分站点禁止被嵌入」提示。实测 `+`→浏览器→输 `example.com`：iframe `src=https://example.com`、tab 标题同步为 `example.com`。
 
 ## 9. 验证
 

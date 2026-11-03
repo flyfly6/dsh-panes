@@ -17,6 +17,18 @@ type Branch = DirectoryEntry[] | 'loading' | 'error'
 /** Lazy directory tree over `workspaceFiles.list`; click a file to open a tab. */
 export function ExplorerView({ root, sessionId, remote, onOpen, t }: Props) {
   const [branches, setBranches] = React.useState<Record<string, Branch>>({})
+  const [menu, setMenu] = React.useState<null | { x: number; y: number; path: string; isDir: boolean }>(null)
+
+  React.useEffect(() => {
+    if (menu === null) return
+    const dismiss = () => setMenu(null)
+    window.addEventListener('click', dismiss)
+    window.addEventListener('blur', dismiss)
+    return () => {
+      window.removeEventListener('click', dismiss)
+      window.removeEventListener('blur', dismiss)
+    }
+  }, [menu])
 
   const load = React.useCallback(
     (relative: string) => {
@@ -63,6 +75,10 @@ export function ExplorerView({ root, sessionId, remote, onOpen, t }: Props) {
             className={cn('h-[22px] w-full justify-start gap-1 rounded-none px-1 text-xs font-normal')}
             style={{ paddingLeft: 4 + depth * 12 }}
             onClick={() => (isDir ? (open ? collapse(childPath) : load(childPath)) : onOpen(childPath, child.name))}
+            onContextMenu={(event) => {
+              event.preventDefault()
+              setMenu({ x: event.clientX, y: event.clientY, path: childPath, isDir })
+            }}
           >
             <span className="grid h-3 w-3 place-items-center text-muted-foreground">
               {isDir ? (
@@ -90,6 +106,44 @@ export function ExplorerView({ root, sessionId, remote, onOpen, t }: Props) {
     <div className="py-1 text-xs">
       <div className="truncate px-3 py-1 text-2xs text-muted-foreground">{root}</div>
       {level('', 0)}
+      {menu !== null && (
+        <div className="workbench-portal fixed z-50 min-w-[160px] rounded-md border border-border bg-popover p-1 text-xs shadow-lg" style={{ left: menu.x, top: menu.y }}>
+          {!menu.isDir && (
+            <Button
+              variant="ghost"
+              className="h-[24px] w-full justify-start px-2 text-xs font-normal"
+              onClick={() => {
+                onOpen(menu.path, menu.path.split('/').pop() ?? menu.path)
+                setMenu(null)
+              }}
+            >
+              {t('explorer.open')}
+            </Button>
+          )}
+          {menu.isDir && (
+            <Button
+              variant="ghost"
+              className="h-[24px] w-full justify-start px-2 text-xs font-normal"
+              onClick={() => {
+                load(menu.path)
+                setMenu(null)
+              }}
+            >
+              {t('explorer.open')}
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            className="h-[24px] w-full justify-start px-2 text-xs font-normal"
+            onClick={() => {
+              void navigator.clipboard?.writeText(`${root}/${menu.path}`)
+              setMenu(null)
+            }}
+          >
+            {t('explorer.copyPath')}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

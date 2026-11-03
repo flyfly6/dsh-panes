@@ -42,7 +42,7 @@ function PanelIcon({ size }: { size: number }) {
   )
 }
 
-export function apply(ctx: any): void {
+export function apply(ctx: any, config: { startup?: string } = {}): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-workbench: locale')
   const t = ctx.locale.bind(NS)
   const close = () => ctx.layout.selectPanel(null)
@@ -96,4 +96,18 @@ export function apply(ctx: any): void {
       ),
     'dsh-workbench: sidebar launcher',
   )
+
+  // D10: land on the workbench at startup unless the user asked for the conversation.
+  // `toggleSidebar` is not on the client layout service, so the dsh sidebar stays as is
+  // (S10 fallback: no programmatic collapse, the panel keeps its own 返回会话 button).
+  if ((config.startup ?? 'workspace') !== 'conversation') {
+    const timer = setTimeout(() => {
+      try {
+        ctx.layout.selectPanel(PANEL_KEY)
+      } catch {
+        /* layout not ready: the sidebar row still works */
+      }
+    }, 300)
+    ctx.effect(() => () => clearTimeout(timer), 'dsh-workbench: startup panel')
+  }
 }

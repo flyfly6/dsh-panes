@@ -45,6 +45,7 @@ import { Input } from '../ui/input'
 import { cn } from '../ui/cn'
 import { ExplorerView } from './ExplorerView'
 import { FileView } from './FileView'
+import { BrowserView } from './BrowserView'
 import { MarkdownView } from './MarkdownView'
 import { QuickOpen } from './QuickOpen'
 import { SearchView } from './SearchView'
@@ -222,8 +223,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
       return
     }
     if (kind === 'browser') {
-      const url = window.prompt('URL', 'https://')
-      if (url !== null && url.trim() !== '') open({ kind: 'browser', contentId: url.trim(), title: url.trim() })
+      open({ kind: 'browser', contentId: 'about:blank', title: t('tab.browser') })
       return
     }
     open({ kind, contentId: kind, title: t(`tab.${kind}`) })
@@ -504,6 +504,31 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
         remote={remote}
         onOpen={(path, name) => openFile(path, undefined, name)}
         t={t}
+      />
+    )
+  } else if (activeTab.kind === 'browser') {
+    content = (
+      <BrowserView
+        url={activeTab.contentId}
+        t={t}
+        onNavigate={(url) =>
+          activeProjectId !== null &&
+          setLayout((prev) => {
+            const current = projectState(prev, activeProjectId)
+            return {
+              ...prev,
+              projects: {
+                ...prev.projects,
+                [activeProjectId]: {
+                  ...current,
+                  tabs: current.tabs.map((tab) =>
+                    tab.id === activeTab.id ? { ...tab, contentId: url, title: url.replace(/^https?:\/\//, '') } : tab,
+                  ),
+                },
+              },
+            }
+          })
+        }
       />
     )
   } else if (activeTab.kind === 'search') {
