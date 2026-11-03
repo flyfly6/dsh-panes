@@ -1,3 +1,4 @@
+import * as React from 'react'
 /**
  * dsh-workbench — browser half entry.
  *
@@ -8,11 +9,28 @@
 import styles from './generated/styles'
 import { en, NS, zh } from './locale'
 import { applyGitPanel, GitTab } from './git/tab'
+import { NotesList } from './notes/NotesList'
 import { ConversationSlot } from './panel/ConversationSlot'
 import { createRegistry, WorkbenchPanel, type TabRegistry } from './panel/WorkbenchPanel'
 
+/**
+ * The editor (BlockNote) is loaded on demand: it is by far the heaviest thing in
+ * this bundle, and a note tab is the only thing that needs it. React.lazy keeps
+ * the panel's boot path independent of it.
+ */
+const NoteEditorLazy = React.lazy(async () => {
+  const module = await import('./notes/NoteEditor')
+  return { default: module.NoteEditor }
+})
+
 const PLUGIN_ID = 'dsh-workbench'
 const PANEL_KEY = 'workbench'
+
+/** `dir/some-note.md` -> `some-note`, the tab label before the note loads a title. */
+function noteTitle(path: string): string {
+  const name = path.split('/').pop() ?? path
+  return name.replace(/\.md$/i, '')
+}
 
 export const name = PLUGIN_ID
 export const inject = ['slots', 'layout', 'locale', 'workspaces', 'sessions', 'webTerminals', 'remote', 'remote.workspaceFiles'] as const
@@ -70,6 +88,31 @@ export function apply(ctx: any, config: { startup?: string } = {}): void {
       ),
     })
   }, 'dsh-workbench: git tab')
+
+  // T3: the notes vault is global (it lives outside every workspace), so both
+  // tabs take no project path at all.
+  ctx.effect(() => {
+    const offList = registry.register({
+      kind: 'notes',
+      order: 50,
+      render: ({ open, t }) => (
+        <NotesList t={t} open={(path) => open({ kind: 'note', contentId: path, title: noteTitle(path) })} />
+      ),
+    })
+    const offNote = registry.register({
+      kind: 'note',
+      order: 51,
+      render: ({ tab, t }) => (
+        <React.Suspense fallback={<div className="p-4 text-xs text-muted-foreground">{t('notes.loading')}</div>}>
+          <NoteEditorLazy path={tab.contentId} t={t} />
+        </React.Suspense>
+      ),
+    })
+    return () => {
+      offNote()
+      offList()
+    }
+  }, 'dsh-workbench: notes tabs')
 
   const apps = () => {
     try {

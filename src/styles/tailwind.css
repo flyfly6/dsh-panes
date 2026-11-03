@@ -115,3 +115,19 @@
 .workbench-root .wb-markdown img { max-width: 100%; border-radius: var(--radius); }
 .workbench-root .wb-markdown hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
 .workbench-root .wb-md-missing { color: var(--muted-foreground); font-style: italic; }
+
+/* ---- notes (T3): the Notion column -------------------------------------- */
+.workbench-root .wb-note { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.workbench-root .wb-note-bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 11px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent); border-bottom: 1px solid var(--border); }
+.workbench-root .wb-note-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.workbench-root .wb-note-page { max-width: 760px; margin: 0 auto; padding: 28px 32px 120px; }
+.workbench-root .wb-note-title { display: block; width: 100%; margin: 0 0 14px; padding: 0; border: 0; outline: none;
+  background: transparent; color: var(--foreground); font-size: 32px; font-weight: 700; line-height: 1.25; }
+.workbench-root .wb-note-title::placeholder { color: var(--faint-foreground); }
+.workbench-root .wb-note-status { display: flex; align-items: center; gap: 12px; height: 26px; flex: none;
+  padding: 0 12px; border-top: 1px solid var(--border); background: var(--card); font-size: 10px; color: var(--muted-foreground); }
+/* BlockNote owns its own typography; only the surface is ours. */
+.workbench-root .bn-container { background: transparent; }
+.workbench-root .bn-editor { padding-inline: 0; }
+.workbench-root .bn-editor .bn-block-content { font-size: 13.5px; }

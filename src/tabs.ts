@@ -15,6 +15,7 @@ export type TabKind =
   | 'browser'
   | 'git'
   | 'note'
+  | 'notes'
 
 export const KNOWN_KINDS: readonly TabKind[] = [
   'session',
@@ -25,6 +26,7 @@ export const KNOWN_KINDS: readonly TabKind[] = [
   'browser',
   'git',
   'note',
+  'notes',
 ]
 
 export interface TabModel {

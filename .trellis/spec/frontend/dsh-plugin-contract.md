@@ -189,3 +189,52 @@ into our own bundle (done for `dsh-ide-git` → `src/git/panel.js`, see
   refuses the write ("Config field … is not volatile") and the switch silently
   rolls back. Verified live: declaring `experimentalRemoteOps` and toggling it
   from the card updates the row config and re-renders the panel without a reload.
+
+## Shipping a rich-text editor in a single-file bundle (BlockNote, verified 2026-11-03)
+
+The browser half is one CJS file with no module graph, and that collides with
+modern editor packages in four specific ways. All four bit us; all four are now
+handled, two in `tsdown.config.ts` and two in `scripts/wrap-client.mjs`.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `require("node:crypto") missed the module table` | a dependency (yjs → lib0) resolved its **node** export condition | the wrapper's `require` shims `node:crypto`/`crypto` to `{ webcrypto: globalThis.crypto }` |
+| `process is not defined` | libraries read `process.env.NODE_ENV` | the wrapper declares a local `var process` inside the factory (never a global: `globalThis.process` makes *other* plugins take their node branch and crash) |
+| `Cannot read properties of undefined (reading 'S')` on first render | **`react-dom/client` was bundled a second time**; its internals (`ReactSharedInternals.S`, React 19 name) ran against the host's React 18 | externalize `react-dom/*` and `react/jsx-runtime` **as a family** |
+| `import.meta` / split chunks / duplicated React | code splitting or a second React copy | `outputOptions.inlineDynamicImports: true` + external `react`/`react-dom*` |
+
+Two more rules that come from this:
+
+- **CSS**: Mantine/BlockNote ship `@import` chains; the bundle can only carry
+  text, so `scripts/build-styles.mjs` inlines `@import url(...)` recursively
+  (`createRequire` + a seen-set) and appends the result to the injected stylesheet.
+- **Evaluate the heavy module lazily**: `React.lazy(() => import('./notes/NoteEditor'))`.
+  The download is still at boot (one file), but a module-eval failure then costs
+  one tab instead of the whole panel — and it turns an opaque boot error into a
+  catchable stack you can read off `window.__workbenchLastError`.
+
+## Row config values are volatile refs, not values
+
+`apply(ctx, config)` receives objects with a `get()` for every field declared with
+`.volatile()` — `JSON.stringify(config)` prints `{}` for all of them, and reading
+`config.field` gives you an object, not the value. Two consequences:
+
+- host code that reads config per request must dereference (`value.get()`), e.g.
+  `plainConfig(config)` / `configValue(value)`;
+- reading it once at `apply` time freezes the value — the settings page's writes
+  then do nothing until a reload.
+
+## Notes vault conventions (T3)
+
+- `.md` is the only truth: the editor converts blocks on save, the host owns the
+  frontmatter (unknown fields and their order survive; only `title`/`created`/
+  `updated` are written).
+- Every write is conditional on the `etag` read with the note (`mtimeMs:size`);
+  a mismatch is `notes/conflict` (409), never a silent overwrite.
+- Paths are vault-relative; `..`, absolute paths and `.trash` are refused before
+  any fs call, and reads verify the resolved path stays inside the vault.
+- Delete moves the note to `<vault>/.trash/<ISO>-<name>.md`.
+- BlockNote cannot represent footnotes or raw HTML: compare the markdown
+  round-trip (whitespace-insensitive) and **warn**; do not silently normalise and
+  do not lock the note into a read-only mode either (a preview that renders a
+  stale body is worse than a warning).

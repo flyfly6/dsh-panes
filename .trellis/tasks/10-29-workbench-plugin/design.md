@@ -427,7 +427,9 @@ const Conversation = require('@deepseek-ai/dsh-client-ui-conversation')
 
 - **仓库文件预览继续用 markdown-it**（已实现，40KB 量级，GFM 覆盖更全、DOMPurify 消毒后直接出 HTML）；BlockNote 只出现在笔记 tab。
 - 视觉一致靠样式层：`.wb-markdown` 的排版规则同样作用于 BlockNote 只读态，不追求同一渲染器。
-- **存储待定（T3 前必须决）**：BlockNote 的 markdown 导入/导出均 lossy，无损要求存 Block JSON；而 D4 定义「一条笔记一个 `.md`」。三个选项：(a) 存 `.md`、只用受支持子集（推荐）；(b) 存 Block JSON（偏离 D4）；(c) `.md` 为正本 + `.blocks.json` 缓存。
+- **存储已决（用户选定，2026-11-03）**：**(a) `.md` 为唯一正本、只用受支持子集**。块 ↔ Markdown 由 BlockNote 自身转换（`tryParseMarkdownToBlocks` / `blocksToMarkdownLossy`），不自写块模型；frontmatter 由宿主独占（编辑器只碰 body，未知字段与顺序原样保留）；往返比对只用于**提示**（表格/任务列表/代码块可往返，脚注与原始 HTML 会规范化）。
+- **实现中修正的两条选型**：① UI kit 用 `@blocknote/ariakit`（`@blocknote/mantine` 在这套组合下渲染即抛 `Cannot read properties of undefined (reading 'S')`）；② `react-dom/*` 必须整族外部化（二次打包的 react-dom 与宿主 React 18 的 `ReactSharedInternals.S` 冲突），`node:crypto` / `process` 由 wrapper 兜底 shim。
+- **实测体积**：整包 8.1 MB raw / **2.23 MB gzip**（BlockNote + yjs ≈ 1.5 MB gzip）。代价记录在此，作为「是否值得」的唯一依据。
 
 ## 3.4 Git 半（fork 自 dsh-ide-git，MIT）
 

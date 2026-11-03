@@ -33,6 +33,7 @@ import {
   type TabKind,
   type TabModel,
 } from '../tabs'
+import { call } from '../api'
 import { Button } from '../ui/button'
 import {
   DropdownMenu,
@@ -53,13 +54,16 @@ import { useGitSummary } from '../git/status'
 import { MarkdownView } from './MarkdownView'
 import { QuickOpen } from './QuickOpen'
 import { SearchView } from './SearchView'
-import type { PanelProps, Project } from './types'
+import { isNoteDirty } from '../notes/store'
+import type { PanelProps, Project, Translate } from './types'
 
 const STORE_KEY = 'dsh-workbench:layout'
 
 /** What a registered tab type gets to draw its body. */
 export interface TabRenderProps {
   tab: TabModel
+  /** The panel's translator (same dictionary the shell uses). */
+  t: Translate
   /** The project the tab belongs to (its `path` is the folder every view roots at). */
   project?: Project
   /** The project's session: host services (terminal, conversation) key on it. */
@@ -103,6 +107,7 @@ const KIND_ICON: Record<TabKind, React.ComponentType<{ className?: string }>> = 
   browser: Globe,
   git: GitBranch,
   note: StickyNote,
+  notes: StickyNote,
 }
 
 function readStored(): Layout {
@@ -258,6 +263,8 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
   const closeOne = (id: string) => {
     if (activeProjectId === null) return
     const tab = projectState(layout, activeProjectId).tabs.find((candidate) => candidate.id === id)
+    /* R3.7: an unsaved note asks before the tab (and its text) goes away. */
+    if (tab?.kind === 'note' && isNoteDirty(tab.contentId) && !window.confirm(t('notes.closeDirty'))) return
     const sessionId = project?.sessionIds[0]
     if (tab?.kind === 'terminal' && sessionId !== undefined) closeTerminalModel(`${sessionId}:${id}`)
     setLayout((prev) => closeTab(prev, activeProjectId, id))
@@ -279,7 +286,8 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
     { kind: 'terminal', label: t('tab.terminal') },
     { kind: 'browser', label: t('tab.browser') },
     { kind: 'git', label: t('tab.git') },
-    { kind: 'note', label: t('tab.note') },
+    { kind: 'notes', label: t('tab.notes') },
+    { kind: 'note', label: t('menu.newNote') },
   ]
 
   const createTab = (kind: TabKind | 'openFile') => {
@@ -303,6 +311,18 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
       const sessionId = project?.sessionIds[0]
       if (sessionId === undefined) return
       open({ kind: 'session', contentId: sessionId, title: t('tab.session') })
+      return
+    }
+    if (kind === 'notes') {
+      open({ kind: 'notes', contentId: 'notes', title: t('tab.notes') })
+      return
+    }
+    if (kind === 'note') {
+      // New note: the host owns the file, the list owns the naming.
+      void call<{ path: string; title: string }>('notes.create', { title: t('notes.untitledNew') }).then(
+        (created) => open({ kind: 'note', contentId: created.path, title: created.title }),
+        () => undefined,
+      )
       return
     }
     open({ kind, contentId: kind, title: t(`tab.${kind}`) })
@@ -663,6 +683,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
       >
         {registry.get(activeTab.kind)!.render!({
           tab: activeTab,
+          t,
           project,
           sessionId: project?.sessionIds[0],
           open,

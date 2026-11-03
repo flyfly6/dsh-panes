@@ -24,6 +24,9 @@ export class Guarded extends React.Component<Props, State> {
   override componentDidCatch(error: Error): void {
     // Surface it without breaking the app: consoles are the only cheap channel here.
     console.warn('[dsh-workbench] embedded conversation failed:', error)
+    // Also park it on window: the console channel truncates stacks, and a support
+    // report needs the real frame list.
+    ;(window as unknown as { __workbenchLastError?: string }).__workbenchLastError = String(error?.stack ?? error)
   }
 
   override render(): React.ReactNode {
