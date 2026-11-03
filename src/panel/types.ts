@@ -8,6 +8,12 @@ export interface Remote {
       range: { offset: number; limit: number },
       signal?: AbortSignal,
     ) => Promise<{ ok: true; value: FileText } | { ok: false; error: { code: string; message: string } }>
+    readBytes?: (
+      sessionId: string,
+      path: string,
+      options: Record<string, unknown>,
+      signal?: AbortSignal,
+    ) => Promise<{ ok: true; value: { data: Uint8Array } } | { ok: false; error: { code: string; message: string } }>
     list: (
       sessionId: string,
       path: string,

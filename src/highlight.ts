@@ -108,6 +108,32 @@ export function isDark(): boolean {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches === true && root.dataset.dsDarkTheme !== 'light'
 }
 
+/** Markdown fence aliases → loaded grammar id. */
+const BY_ALIAS: Record<string, string> = {
+  js: 'javascript',
+  jsx: 'jsx',
+  md: 'markdown',
+  py: 'python',
+  rs: 'rust',
+  sh: 'bash',
+  ts: 'typescript',
+  tsx: 'tsx',
+  yml: 'yaml',
+  zsh: 'bash',
+}
+
+/** Highlight one fenced code block by language name (markdown preview). */
+export async function highlightCode(lang: string, code: string): Promise<string | null> {
+  const id = BY_ALIAS[lang.toLowerCase()] ?? (BY_EXTENSION[lang.toLowerCase()] !== undefined ? lang.toLowerCase() : undefined)
+  if (id === undefined) return null
+  try {
+    const instance = await highlighter()
+    return instance.codeToHtml(code, { lang: id, theme: isDark() ? 'github-dark' : 'github-light' })
+  } catch {
+    return null
+  }
+}
+
 const MAX_LINE = 5000
 
 export async function highlightToHtml(path: string, code: string): Promise<string | null> {

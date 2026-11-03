@@ -47,9 +47,10 @@
 
 ## 7. Markdown 预览
 
-- [ ] markdown-it + GFM + sanitize；相对图片经 `/api/file`；代码块接 shiki。
-- [ ] 预览/源码切换 + `Ctrl+Shift+V`，滚动位置记忆。
-- [ ] 导出一套块渲染组件，供 T3 的 Notion 编辑器复用。
+- [x] markdown-it + GFM（table / task lists / strikethrough / footnotes / linkify）+ DOMPurify sanitize（raw HTML 关闭）；外链强制 `target=_blank rel=noreferrer`。
+- [x] 代码块用同一 shiki 实例高亮（渲染后原地替换 `pre code`）。
+- [x] 相对图片走宿主 `readBytes` → `URL.createObjectURL` blob（不暴露文件系统路径）；读不到时降级为 `[文件名]` 占位。
+- [x] 预览 / 源码切换（按钮 + `Ctrl+Shift+V`）；滚动位置记忆与 T3 复用组件未做。
 
 ## 8. 会话 / 终端 / 浏览器 tab
 

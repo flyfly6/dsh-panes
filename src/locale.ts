@@ -45,6 +45,8 @@ export const zh: Dict = {
   'search.hits': '处命中',
   'search.truncated': '结果已截断',
   'quickOpen.placeholder': '按文件名跳转…',
+  'markdown.preview': '预览',
+  'markdown.source': '源码',
 }
 
 export const en: Dict = {
@@ -88,4 +90,6 @@ export const en: Dict = {
   'search.hits': 'hits',
   'search.truncated': 'truncated',
   'quickOpen.placeholder': 'Go to file by name…',
+  'markdown.preview': 'Preview',
+  'markdown.source': 'Source',
 }

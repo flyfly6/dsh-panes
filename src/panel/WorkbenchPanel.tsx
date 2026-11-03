@@ -45,6 +45,7 @@ import { Input } from '../ui/input'
 import { cn } from '../ui/cn'
 import { ExplorerView } from './ExplorerView'
 import { FileView } from './FileView'
+import { MarkdownView } from './MarkdownView'
 import { QuickOpen } from './QuickOpen'
 import { SearchView } from './SearchView'
 import type { PanelProps, Project } from './types'
@@ -476,13 +477,23 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
   } else if (remote === undefined) {
     content = <div className="p-3 text-xs text-muted-foreground">host bridge unavailable</div>
   } else if (activeTab.kind === 'file') {
-    content = (
+    const line = typeof activeTab.params?.line === 'number' ? (activeTab.params.line as number) : undefined
+    const markdown = /\.mdx?$/i.test(activeTab.contentId)
+    content = markdown ? (
+      <MarkdownView
+        path={activeTab.contentId}
+        sessionId={project?.sessionIds[0]}
+        remote={remote}
+        t={t}
+        line={line}
+      />
+    ) : (
       <FileView
         path={activeTab.contentId}
         sessionId={project?.sessionIds[0]}
         remote={remote}
         t={t}
-        line={typeof activeTab.params?.line === 'number' ? (activeTab.params.line as number) : undefined}
+        line={line}
       />
     )
   } else if (activeTab.kind === 'explorer') {

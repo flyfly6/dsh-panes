@@ -32,7 +32,9 @@ export function QuickOpen({ root, onOpen, onClose, t }: Props) {
         setHits(data.hits)
         setActive(0)
       })
-      .catch((failure: Error) => failure.name !== 'AbortError' && setHits([]))
+      .catch((failure: Error) => {
+        if (failure.name !== 'AbortError') setHits([])
+      })
   }, [query, root])
 
   const choose = (hit: NameHit | undefined) => {
