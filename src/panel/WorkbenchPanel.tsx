@@ -46,6 +46,7 @@ import { cn } from '../ui/cn'
 import { ExplorerView } from './ExplorerView'
 import { FileView } from './FileView'
 import { BrowserView } from './BrowserView'
+import { SessionCard } from './SessionCard'
 import { MarkdownView } from './MarkdownView'
 import { QuickOpen } from './QuickOpen'
 import { SearchView } from './SearchView'
@@ -224,6 +225,12 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
     }
     if (kind === 'browser') {
       open({ kind: 'browser', contentId: 'about:blank', title: t('tab.browser') })
+      return
+    }
+    if (kind === 'session') {
+      const sessionId = project?.sessionIds[0]
+      if (sessionId === undefined) return
+      open({ kind: 'session', contentId: sessionId, title: t('tab.session') })
       return
     }
     open({ kind, contentId: kind, title: t(`tab.${kind}`) })
@@ -506,6 +513,8 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
         t={t}
       />
     )
+  } else if (activeTab.kind === 'session') {
+    content = <SessionCard sessionId={activeTab.contentId} onOpen={close} t={t} />
   } else if (activeTab.kind === 'browser') {
     content = (
       <BrowserView

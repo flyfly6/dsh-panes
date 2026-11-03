@@ -55,7 +55,7 @@
 
 ## 8. 会话 / 终端 / 浏览器 tab
 
-- [ ] 会话：`SessionProvider` + 宿主 `Conversation.View`；先按 S9 结论决定「双实例」还是「portal 换宿主」。
+- [~] 会话：**S9 结论＝无法内嵌**（工作台激活时宿主不挂载对话 DOM；ui-conversation 无 View 组件导出）。按用户决定改为**单实例句柄**：`contentId = sessionId` 天然去重（同一 session 只一个 tab），tab 内是会话卡，点「回到会话」`selectPanel(null)`。实测：连开两次仍只有 1 个 tab，按钮能返回会话视图。
 - [ ] 终端：复用 terminal controller（list → attach → 读写）；关闭调终止；不可用降级为跳转按钮。
 - [x] 浏览器：iframe + 自管历史（后退/前进/刷新）+ 地址栏；非 http(s) 自动补 `https://`，非法输入不导航；`sandbox` + `referrerPolicy`；底部固定「部分站点禁止被嵌入」提示。实测 `+`→浏览器→输 `example.com`：iframe `src=https://example.com`、tab 标题同步为 `example.com`。
 

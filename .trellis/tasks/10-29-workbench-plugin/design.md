@@ -497,11 +497,12 @@ Git 操作
 | S1 | 用最小 `main` 面板 + 一次 `workspaceFiles.read` 打通「安装 → 左侧栏出现入口 → 读文件上屏」 | Desktop 客户端里 30 分钟内可见 | 检查 `dsh.client.inject` 与 ModuleLoader id 是否匹配 |
 | S2 | 在客户端 bundle 内 `require('shiki')` / `require('@xterm/xterm')` | 能拿到导出并渲染 | 自带打包进 `client.js`，只留 react 为 external |
 | S3 | 打开右侧栏终端并与其 controller 交互，确认可复用 | 能列出 shell 并附着 | 终端 tab 降级为「跳转右侧栏终端」 |
+| S3′ | 客户端能否直接驱动终端（2026-11-03 探测） | **可以**：`ctx.remote.terminal` 暴露 `create/list/attach/close/rename/retain/shells`，`@deepseek-ai/dsh-api-terminal-controller` 可 require（`ClientTerminals`）；`terminal` 不是独立客户端服务，必须走 `remote.terminal` | 自绘 xterm 承载（S2 已确认 `@xterm/*` 需打包） |
 | S4 | 本地目录安装进 desktop profile 并热更新 | 改代码后刷新生效 | 退化为重启客户端验证 |
 | S5 | `require('@deepseek-ai/dsh-client-ui-primitives')` 取 `DiffBlock` / `FileTypeIcon` | 拿到组件 | 自绘 diff 与文件图标（上游已用 try/catch 姿态，可直接照抄降级） |
 | S6 | fork 的上游面板去掉 betterSidebar/native 注册后，能否原样拿到数据 | 面板在最小宿主里渲染出分支树与提交列表 | 先只接 `summary`/`branches`/`log` 三个方法，验证通路后再接其余 |
 | S7 | 侧栏 reveal/自动切视图的手感 | 打开文件后 300ms 内高亮到位且不打断用户操作 | 关闭自动 reveal，只保留手动「在文件中显示」按钮 |
 | S8 | Desktop 的 webview 是否可编程创建 | 能开 URL | 浏览器 tab 仅用 iframe（web 语义） |
-| S9 | 同一 session 能否同时挂两份宿主会话页（主视图 + tab） | 两边都能收发消息、不重复订阅、焦点不打架 | 改为「同一实例换宿主」：portal 会话页到当前激活的容器，另一处留占位 |
+| S9 | 同一 session 能否同时挂两份宿主会话页（主视图 + tab） | 两边都能收发消息、不重复订阅、焦点不打架 | **实测结论（2026-11-03）：不可行且不需要**。① 宿主在其他 `main` 面板激活时**根本不挂载**对话 DOM（工作台打开时 composer 不存在），portal 无源可搬；② `@deepseek-ai/dsh-client-ui-conversation` 只导出控制器/注册表（`ConversationController`、`ConversationViewRegistry`…），**没有可复用的 View 组件**，要内嵌就得重写对话 UI，违反 design §2.3c。→ 会话 tab 退化为**单实例句柄**（用户决定：同一 session 只允许一个 tab），点开回到宿主会话视图。 |
 | S10 | `ctx.layout.toggleSidebar()` 能否被插件程序化调用，折叠后布局如何 | 进入面板时左栏收起、离开恢复 | 不折叠，面板内提供「展开/收起 dsh 侧栏」按钮，接受双栏 |
 | S11 | `ctx.slots.entries('main')` 能否拿到其他全局面板的 key 与 label | 「应用」区能列出插件/自动化任务/MCP 等 | 硬编码已知面板 key 作为兜底清单 |
