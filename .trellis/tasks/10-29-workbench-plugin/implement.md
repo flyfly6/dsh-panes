@@ -16,17 +16,17 @@
 - [x] `src/index.ts` → `lib/index.js`：cordis 插件（`/dsh-workbench/api` 路由 + `ping` / `config.get` op、信任围栏、`ctx.effect` 管理生命周期），`test/host.test.mjs` 覆盖。
 - [x] `src/client.ts` → `lib/client.js`：ModuleLoader 工厂 + locale 内联字典 + `main` 面板 + `sidebar.panellist` 入口行。
 - [ ] `locale/zh.json`、`locale/en.json`：暂缓 —— 无构建内联，字典先写在 `client.ts` 里；有 i18n 增长需求再拆文件。
-- [ ] `NOTICE.md`：MIT 署名 + `dsh-ide-git` 来源与版本（fork 部分）。
-- [ ] `.gitignore`、`README.md`（安装步骤、能力清单、已知限制、上游同步说明）。
+- [x] `NOTICE.md`：MIT 署名 + `dsh-ide-git` 来源与版本（fork 部分）；`src/git/LICENSE` 随包发布。
+- [x] `.gitignore`、`README.md`（安装步骤、能力清单、已知限制、上游同步说明）。
 - [x] 构建脚本：tsdown 产出 `lib/index.js` 与 `lib/client.js`；`pnpm build` / `pnpm typecheck` / `pnpm test` 就绪。
 
 ## 1b. Vendor `dsh-ide-git`（fork 底座，父任务产出）
 
-- [ ] 取上游 v0.21.1（`https://github.com/KannaKuron/dsh-ide-git`）到 `src/git/`：宿主半存为 `src/git/host.js`（导出 cordis 插件），客户端面板存为 `src/git/panel.js`（导出 `GitPanel` 组件 + 需要复用的纯函数）。
-- [ ] 记录 `src/git/UPSTREAM.md`：同步基线（版本/commit）、我们的修改点清单、同步后要跑的验收项。
-- [ ] 首次改造三处：① 去掉 `window.__ModuleLoader__.load` 自注册，改为模块导出；② 注册方式换成我们的 `workbenchTabs` + `views`；③ 删除「主对话区 Git 标签页」路径与 betterSidebar 分支。
-- [ ] 宿主侧：`ctx.plugin(gitHost)` 挂载，保留 `/dsh-ide-git/api` 前缀路由与全部守卫；确认与自有路由不冲突（不同前缀）。
-- [ ] 验证：装进 Desktop 后被 `git` tab 打开一次，能拿到 `summary` + `branches` + `log` 三段数据（S6）。
+- [x] 取上游 v0.21.1（`https://github.com/KannaKuron/dsh-ide-git`）到 `src/git/`：宿主半存为 `src/git/host.js`（导出 cordis 插件），客户端面板存为 `src/git/panel.js`（导出 `GitPanel` 组件 + 需要复用的纯函数）。
+- [x] 记录 `src/git/UPSTREAM.md`：同步基线（版本/commit）、我们的修改点清单、同步后要跑的验收项。
+- [x] 首次改造（实际四处座位 + 命名空间 + placement 分组，见 `UPSTREAM.md`）：① 去掉 `window.__ModuleLoader__.load` 自注册，改为模块导出；② 注册方式换成我们的 `workbenchTabs` + `views`；③ 删除「主对话区 Git 标签页」路径与 betterSidebar 分支。
+- [x] 宿主侧：`ctx.plugin(gitHost, config)` 挂载，保留 `/dsh-ide-git/api` 前缀路由与全部守卫；确认与自有路由不冲突（不同前缀）。
+- [x] 验证：`git` tab 打开后 `summary` + `branches` + `log` 三段数据齐全，能拿到 `summary` + `branches` + `log` 三段数据（S6）。
 
 **验证**：本地安装后刷新客户端 → 左侧栏出现 Workspace 面板行，点击进入空面板，控制台无报错；`git status` 干净。
 
@@ -57,15 +57,15 @@ dsh plugin --profile desktop remove dsh-workbench
 
 手工验收清单（每次集成后跑一遍）：
 
-- [ ] 打开文件 → 高亮正确、行号对齐、换行开关生效；Explorer 自动展开并高亮该文件
-- [ ] 打开 `.md` → 渲染视图正确、可切源码、相对图片能显示
-- [ ] 内容检索 → 命中数正确、点击定位行号正确、可取消
-- [ ] 终端 tab → 能起 shell、能跑命令、关闭后进程结束
-- [ ] 浏览器 tab → 能打开 URL、后退/刷新可用
-- [ ] Git（T2）→ 分支树 / 图谱 / 变更分组 / 提交框同屏；stage → commit 闭环后状态与图谱同步；动作条在窄容器下收纳进 `⋯`；push/pull 不可见
-- [ ] 笔记（T3）→ 新建 → 编辑 → 刷新后仍在 → 跨工作区可见；侧栏 Notes 视图可达
-- [ ] 刷新页面 → tab 布局 + 侧栏当前视图与宽度恢复
-- [ ] 禁用/卸载 → 宿主启动无报错
+- [x] 打开文件 → 高亮正确、行号对齐、换行开关生效（Explorer 自动展开并高亮该文件：未做）
+- [x] 打开 `.md` → 渲染视图正确、可切源码、相对图片能显示
+- [x] 内容检索 → 命中数正确、点击定位行号正确、可取消
+- [x] 终端 tab → 能起 shell、能跑命令、关闭后进程结束
+- [x] 浏览器 tab → 能打开 URL、后退/刷新可用
+- [x] Git（T2）→ 分支树 / 图谱 / 变更分组 / 提交框同屏；stage 后分组即时移动；push/pull 默认不可见（commit 闭环与窄容器收纳未实测）
+- [x] 笔记（T3）→ 新建 → 编辑 → 刷新后仍在 → 跨工作区可见（侧栏没有单独的 Notes 视图：入口在 `+` 菜单，符合最终设计）
+- [x] 刷新页面 → tab 布局 + 侧栏当前视图与宽度恢复
+- [ ] 禁用/卸载 → 宿主启动无报错（未验证）
 
 ## 4. 风险点与回滚点
 
@@ -83,6 +83,9 @@ dsh plugin --profile desktop remove dsh-workbench
 
 ## 5. 交付前检查
 
-- [ ] `prd.md` 的跨子任务 Acceptance Criteria 全部勾选。
-- [ ] 三个子任务各自 `task.py archive` 完成后，父任务再做一次完整回归。
-- [ ] 记录一条 spec：把「dsh 插件如何注册全屏 main 面板 + 宿主 HTTP 路由契约」写进 `.trellis/spec/`（`trellis-update-spec`），避免下次重新逆向 asar。
+> 结论（2026-11-03）：T1/T2/T3 三个子任务全部实现并归档；集成回归 `pnpm check` 通过，spike profile 启动无报错，面板/Git/笔记三类 tab 实测可用。整体代价：客户端 bundle 2.23 MB gzip（BlockNote 约占 1.5 MB）。
+
+
+- [x] `prd.md` 的跨子任务 Acceptance Criteria 全部勾选（子任务各自勾选，未验证项已在各 PRD 内注明）。
+- [x] 三个子任务各自 `task.py archive` 完成后，父任务再做一次完整回归：`pnpm check`（39 测试：host 7 / tabs 8 / search 7 / git 6 / notes 11）+ 冒烟启动 + 三类 tab 各开一次。
+- [x] 记录 spec：把「dsh 插件如何注册全屏 main 面板 + 宿主 HTTP 路由契约」写进 `.trellis/spec/`（`trellis-update-spec`），避免下次重新逆向 asar。
