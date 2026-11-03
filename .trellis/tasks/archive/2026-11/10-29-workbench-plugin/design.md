@@ -194,6 +194,12 @@ body[data-ds-dark-theme] { --workbench-code-keyword: #FF7B72; }
 
 ### 2.0e 字体配置落地
 
+> 实现（2026-11-03）：配置字段 `fontUiFamily` / `fontUiSize` / `fontCodeFamily` /
+> `fontCodeSize` / `fontCodeLineHeight` 进 row config，客户端每次渲染读取 volatile
+> ref 并写进 `.workbench-root` 的 CSS 变量（`--wb-font-*`），因此设置卡改动立即生效、
+> 不必重启。未打包 Inter / JetBrains Mono：`--wb-font-ui` 默认跟随宿主
+> `--dsh-font-family-sans`，本机宿主给的就是 Inter，缺字体时落到系统栈。
+
 设置项（`plugins.bundle.config` slot 渲染，见设计稿 `c00EdY`）：
 
 ```
@@ -509,4 +515,8 @@ Git 操作
 | S8 | Desktop 的 webview 是否可编程创建 | 能开 URL | 浏览器 tab 仅用 iframe（web 语义） |
 | S9 | 同一 session 能否同时挂两份宿主会话页（主视图 + tab） | 两边都能收发消息、不重复订阅、焦点不打架 | **实测结论（2026-11-03）：不可行且不需要**。① 宿主在其他 `main` 面板激活时**根本不挂载**对话 DOM（工作台打开时 composer 不存在），portal 无源可搬；② `@deepseek-ai/dsh-client-ui-conversation` 只导出控制器/注册表（`ConversationController`、`ConversationViewRegistry`…），**没有可复用的 View 组件**，要内嵌就得重写对话 UI，违反 design §2.3c。→ 会话 tab 退化为**单实例句柄**（用户决定：同一 session 只允许一个 tab），点开回到宿主会话视图。③ 另试过 4 条内嵌路径，全部不通（2026-11-03）：`renderFactorySlot('main','conversation')` 返回的 `FactoryOutlet` 在我们的面板里渲染为空（用 `'schedules'` 做对照同样为空，说明 keyed 槽不跨面板派发）；`ctx.slots.entries('main')` 能取到 conversation 条目的 `component`，但它内部调用 slot 注入的 `useSessions/useConversation/useInput/sessionId…`，旁路渲染必崩；portal 无 DOM 可搬；应用无会话深链，iframe 只能塞下整个 app。**④ 但开源仓库里有受支持的路径**（`packages/client/ui-subagent/src/client/sidebar-chat/index.tsx` 的「侧栏子会话聊天」就是同一需求）：父面板声明一个 **session 作用域的 child slot**，就会拿到 `SessionProvider` + `renderSlot` 两个标准 prop；用 `ctx.sessions.retain(sessionId, { source })` 拿到 `SessionReference`，再 `<SessionProvider session={reference}>{renderSlot(childKey)}</SessionProvider>`；child 组件内按 ui-subagent 的写法调用 `renderFactorySlot('conversation.content', { variant: 'embedded', phase, hero }, { slots: { views } })`。**已实测成功**：会话 tab 里出现完整对话（标题、模式、composer、发送按钮）。会话 tab 因此从占位卡升级为真内嵌，用户规则（同一 session 一个 tab）不变。 |
 | S10 | `ctx.layout.toggleSidebar()` 能否被插件程序化调用，折叠后布局如何 | 进入面板时左栏收起、离开恢复 | 不折叠，面板内提供「展开/收起 dsh 侧栏」按钮，接受双栏 |
+
+> **S10 更正（2026-11-03 复核）**：动作在 `ctx.layout.panels`（`toggleSidebar` / `setSidebar` / `selectPanel`），不在 `ctx.layout` 上；只有「当前是否折叠」的状态读不到。客户端因此在挂载时量 `.workbench-root` 的 x 坐标判断，必要时 `toggleSidebar()` 一次，卸载时还原。
+>
+> **路由围栏的实际口径**：宿主半边拿不到 workspace 注册表（`ctx.workspaces` 只有 `model` / `name`，没有 add/list），所以 `search` 与 `notes.*` 接受客户端给的绝对路径，只靠「插件头 + 同源」两道门；design §3「list/search 必须限制在该会话工作区内」在当前宿主 API 下无法实现，已在 README 的 Known limits 里降级为已知事实。
 | S11 | `ctx.slots.entries('main')` 能否拿到其他全局面板的 key 与 label | 「应用」区能列出插件/自动化任务/MCP 等 | 硬编码已知面板 key 作为兜底清单 |
