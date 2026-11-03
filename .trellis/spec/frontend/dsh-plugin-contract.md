@@ -146,3 +146,46 @@ Rebuild + page reload picks up client changes for an already-composed bundle; a
 | Client half silently absent | `exports['./package.json']` or `dsh.client` missing. |
 | `import failed: cannot resolve ...` on boot | The client bundle emitted an ESM import (or a relative chunk) instead of a factory body. |
 | Radix popper renders unstyled/wrong colors | Tokens live on `.workbench-root`; the portal needs them too (`.workbench-portal`). |
+| Plugin warns `@deepseek-ai/schemastery is not resolvable` | The profile has no `@deepseek-ai/schemastery`; a **symlinked dev package** resolves from its real path, not the profile. `dsh plugin --profile <p> add @deepseek-ai/schemastery`. |
+
+## Vendoring an upstream plugin's client bundle (fork recipe)
+
+Upstream plugins ship `src/client.js` already wrapped as
+`window.__ModuleLoader__.load({ id, factory: (require) => { … } })`. To fold one
+into our own bundle (done for `dsh-ide-git` → `src/git/panel.js`, see
+`src/git/UPSTREAM.md`):
+
+1. **Rewrite the wrapper into a factory we call**: replace the head with
+   `export default function createX(require) {` and the tail with
+   `return { apply, …components }; }`. `require` arrives as a *parameter*, so the
+   bundle's own `require` (the wrapper's) is what inner code calls — verified in
+   the built output: the call site stays `createX(require)` and the externals stay
+   `require("react")`.
+2. **Call it lazily, once**: `let loaded = null; function mod() { return loaded ??= createX(require) }`.
+   One instance per page keeps upstream's module-level caches (repo list, first-paint).
+3. **Delete upstream's seat registrations**, keep its `apply` for styles, locale
+   dictionaries, settings card and service bindings. A plugin that registers a
+   sidebar tab always has 2–4 registration doors; removing them is the whole
+   adapter and leaves the UI untouched.
+4. **Rename the config namespaces, not the API route**: row config namespace =
+   *our* loader row id (`workbench`), settings-card key = *our* package name
+   (`dsh-workbench`), locale namespace = a fresh one. The HTTP prefix can stay
+   upstream's (`/dsh-ide-git/api`) — it is not user-visible.
+5. **Add `*.d.ts` siblings** for the vendored `.js` (`allowJs` is off, so tsc
+   ignores the file and reads your hand-written surface).
+6. **Never edit an internal upstream function without a `// [workbench-fork]`
+   marker** and an entry in `UPSTREAM.md`; that file lists the exact hunks a
+   re-sync has to re-apply.
+
+## Row config (`Config` export) — what the settings card needs
+
+- The host serves a plugin's row config to the browser through `ctx.configForms`;
+  the namespace is the **loader row id** from `cordis.patch.yml`, and the Plugins
+  page renders `plugins.bundle.config` keyed by **package name**.
+- The schema comes from the host half's exported `Config` (schemastery). A plugin
+  that is mounted *inside* another plugin (`ctx.plugin(upstream, config)`) cannot
+  export it — build the schema in our own `src/config.ts` instead.
+- Every field the card writes must be declared **and** `.volatile()`, or the Host
+  refuses the write ("Config field … is not volatile") and the switch silently
+  rolls back. Verified live: declaring `experimentalRemoteOps` and toggling it
+  from the card updates the row config and re-renders the panel without a reload.

@@ -436,12 +436,14 @@ const Conversation = require('@deepseek-ai/dsh-client-ui-conversation')
 | 上游部分 | 处理 |
 |---|---|
 | 宿主半 `src/index.js` | 保留：前缀路由 `POST /dsh-ide-git/api/<method>`（32 方法：`summary/branches/log/commitDetail/diff/compare/stage/commit/checkout/branch*/tag*/stash*/fetch/pull/push/reset/revert/cherry-pick/commit-models/commit-efforts/version`）、argv-only `spawn('git', ...)`、同仓写操作串行队列、diff ≤400KB 截断、`engines.dsh` 兼容门槛。改为**被我们的宿主插件 `ctx.plugin(gitHost, config)` 挂载**，不再自带 bundle 行。 |
-| 客户端面板 `src/client.js` | 保留 UI（动作条 / 分支树 / 提交列表 + lane 图谱 / 提交详情 / 变更四分组 / 提交框 / 撤回浮窗 / ResizeObserver 自适应 columns\|stack），只改三处：① `window.__ModuleLoader__.load` 包装 → 变成我们 bundle 内的一个模块导出；② 注册目标从 `ctx.betterSidebar.registerTab(...)` 改为 `workbenchTabs.register({kind:'git', …})` + `views.register({id:'git'})`；③ 去掉「主对话区 Git 标签页」那条注册路径。 |
+| 客户端面板 `src/client.js` | 保留 UI（动作条 / 分支树 / 提交列表 + lane 图谱 / 提交详情 / 变更四分组 / 提交框 / 撤回浮窗 / ResizeObserver 自适应 columns\|stack），改动：① `window.__ModuleLoader__.load` 包装 → `export default function createGitPanel(require)`，由我们的适配层调一次；② 四个座位（better-sidebar tab、原生右侧栏 + 预览 tab、`conversation.view`、输入框胶囊）全部删除，改由 `workbenchTabs.register({kind:'git', render})` 直接渲染 `LocaleLive`；③ 命名空间改名（`RAIL_NS`→`workbench`、`SETTINGS_BUNDLE`→`dsh-workbench`、`LOCALE_NS`→`dsh-workbench.git`），`API_BASE` 保持 `dsh-ide-git/api`；④ placement 设置分组换成「远程操作」开关。 |
 | 依赖 | 去掉 `dsh-better-sidebar` peer；`@deepseek-ai/dsh-client-ui-primitives`（`DiffBlock`/`FileTypeIcon`）改为可选 require + 自带降级渲染（与上游同样的 try/catch 姿态）。 |
-| 配置 | 上游的 row Config（rail 顺序/显隐、commitModel、placement 开关）并入我们的插件配置；`conversationTab` / `immersive` 两个 placement 字段删除。 |
-| push / pull | 代码保留，UI 从动作条与分支右键里默认隐藏（D3）；`config.experimentalRemoteOps=false` 时才出现。宿主侧对应方法保持原样（自带 `confirm: true` 守卫）。 |
+| 配置 | 上游的 row Config 由 `src/config.ts` 生成（`RAIL_CONFIG_IDS` + `commitModel/commitReasoning/commitPrompt` + `experimentalRemoteOps`）；`conversationTab` / `immersive` / `composerStatus` 三个 placement 字段连同其写入点删除。**命名空间 = 我们的 loader row id `workbench`**，设置卡 key = 包名 `dsh-workbench`。 |
+| push / pull | 代码保留，UI 默认隐藏（D3）：动作条、所有右键菜单（`openMenuAt` 单点过滤）、提交框「提交并推送」三处；`experimentalRemoteOps=true` 才出现。**宿主侧也拦**：`assertRemoteOpsAllowed` 对 push/pull/pushTags/remote*/`commit{push}` 返回 `disabled-by-config`（403）——两层锁，UI 隐藏不是唯一防线。 |
 
 **上游同步策略（S6）**：仓库内维护 `src/git/UPSTREAM.md`，记录①同步基线 commit/版本；②我们相对上游的改动清单（上面三处 + 配置 + 隐藏项），以「补丁点清单」形式描述（文件 + 函数 + 行为），不追求自动 merge；③每次同步后跑我们的 T2 验收清单。上游客户端是单文件大文件，**禁止**在不记录的情况下改动其内部函数，避免下次同步丢改动。
+
+**实现结果（2026-11-03，T2）**：`src/git/{host.js,panel.js,LICENSE,UPSTREAM.md}` vendor 完成；宿主半由 `src/index.ts` 以 `ctx.plugin(gitHost, config)` 挂载（`ctx.effect` 的 disposer 里 `fiber.dispose()`），路由与全部守卫为上游原样；客户端面板由 `src/git/tab.tsx` 适配（`scope:{cwd,sessionId}` + `visible:true`）。额外修了上游两处空仓库缺陷（unborn branch、无提交的 `log`）。实测：17 处改动的真实仓库里分支树/提交列表/变更分组/暂存-取消暂存/双击 diff/设置页远程开关全部走通；`test/git.test.mjs`（6 条）覆盖信任围栏、配置闸门、空仓库与非仓库路径。
 
 数据流：客户端面板 → `POST /dsh-ide-git/api/<method>`（同源、带 `x-dsh-plugin` 头）→ 宿主 spawn git → 结构化结果。仓库根由客户端传入 `cwd`（当前会话工作区），宿主侧校验路径为绝对路径、ref 不以 `-` 开头、无控制字符、路径不越出仓库。
 

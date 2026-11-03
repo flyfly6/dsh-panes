@@ -4,9 +4,10 @@ Tabbed workspace workbench for DeepSeek Harness: one full-screen `main` panel
 with a project sidebar and per-project tabs (code view, search, Markdown
 preview, terminal, browser, session, Git, notes).
 
-**Status: T1 in progress.** The panel shell, project sidebar, per-project tabs,
-file view and explorer exist; highlighting, search, terminal/browser/session tabs
-land next, then the Git client (T2) and notes (T3).
+**Status: T1 done, T2 done, T3 next.** The panel shell, project sidebar,
+per-project tabs, file/explorer/search views, Markdown preview, terminal,
+browser, embedded session and the **Git tool window** exist; the Notion-style
+notes tab (T3) lands next.
 
 The repository root *is* the package: `package.json`, `src/`, `test/` and
 `cordis.patch.yml` sit here beside `designs/` and `.trellis/`.
@@ -34,7 +35,9 @@ Uninstall: remove it from `dsh.profile.bundles` and run
 |---|---|
 | `src/index.ts` | Host half: cordis plugin, `POST /dsh-workbench/api` route. |
 | `src/ui/` | shadcn primitives (button, input, dropdown-menu) + `cn()`. |
-| `src/panel/` | Panel shell, file view, explorer view, shared types. |
+| `src/panel/` | Panel shell, file/explorer/search/Markdown/terminal/browser views, shared types. |
+| `src/git/` | Git tool window, forked from `dsh-ide-git` v0.21.1 (MIT): `host.js` (routes + guards), `panel.js` (UI), `tab.tsx`/`status.ts` (adapter), `UPSTREAM.md`. |
+| `src/config.ts` | Row config schema (startup, Git rail switches, AI commit message, `experimentalRemoteOps`). |
 | `src/styles/tailwind.css` | Design tokens (host theme vars) + Tailwind layers. |
 | `src/client.ts` | Browser half: registers the `main` panel + its `sidebar.panellist` launcher row; panel shell, tabs, file/explorer views. |
 | `src/tabs.ts` | Pure tab model: per-project tab sets, idempotent open, persisted layout. |
@@ -73,7 +76,14 @@ profile needs a client restart to be composed into the boot graph.
 ## Known limits
 
 - No editor/write-back, no LSP: this is a reading workspace.
-- Git `push` / `pull` stay hidden by default (see the task design, D3).
+- Git `push` / `pull` stay hidden by default (D3): the buttons are absent until
+  `experimentalRemoteOps` is on in the plugin settings, and the host refuses those
+  methods (`disabled-by-config`) while it is off.
+- The Git panel is a fork: before touching `src/git/panel.js` read
+  `src/git/UPSTREAM.md` — our edits are `[workbench-fork]`-marked hunks that a
+  re-sync has to re-apply.
+- The Git status bar/badge call `summary` with `stats: false` (no `--numstat`
+  passes); it shows `±n` changed files, not added/removed line counts.
 - `shiki` and `@xterm/*` are not in the host's shared module table, so they must
   be bundled into `lib/client.js` (probe: 2026-11-03).
 - Search uses the machine's `rg` first, then the `rg` bundled via `@vscode/ripgrep`,
