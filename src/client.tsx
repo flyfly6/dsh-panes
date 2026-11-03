@@ -7,6 +7,7 @@
  */
 import styles from './generated/styles'
 import { en, NS, zh } from './locale'
+import { applyGitPanel, GitTab } from './git/tab'
 import { ConversationSlot } from './panel/ConversationSlot'
 import { createRegistry, WorkbenchPanel, type TabRegistry } from './panel/WorkbenchPanel'
 
@@ -56,6 +57,19 @@ export function apply(ctx: any, config: { startup?: string } = {}): void {
   } catch {
     /* host without provide(): built-in kinds still work */
   }
+
+  // T2: the Git tool window. The host half owns /dsh-ide-git/api/*; this only
+  // mounts its styles/dictionaries and registers the tab type.
+  ctx.effect(() => {
+    applyGitPanel(ctx)
+    return registry.register({
+      kind: 'git',
+      order: 30,
+      render: ({ project, sessionId }) => (
+        <GitTab ctx={ctx} cwd={project?.path ?? ''} sessionId={sessionId} />
+      ),
+    })
+  }, 'dsh-workbench: git tab')
 
   const apps = () => {
     try {

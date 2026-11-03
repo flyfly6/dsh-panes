@@ -49,6 +49,7 @@ import { BrowserView } from './BrowserView'
 import { SessionCard } from './SessionCard'
 import { Guarded } from './Guarded'
 import { closeTerminalModel, TerminalView as TerminalPane, type TerminalModel } from './TerminalView'
+import { useGitSummary } from '../git/status'
 import { MarkdownView } from './MarkdownView'
 import { QuickOpen } from './QuickOpen'
 import { SearchView } from './SearchView'
@@ -56,10 +57,23 @@ import type { PanelProps, Project } from './types'
 
 const STORE_KEY = 'dsh-workbench:layout'
 
+/** What a registered tab type gets to draw its body. */
+export interface TabRenderProps {
+  tab: TabModel
+  /** The project the tab belongs to (its `path` is the folder every view roots at). */
+  project?: Project
+  /** The project's session: host services (terminal, conversation) key on it. */
+  sessionId?: string
+  /** Open (or focus) another tab in this project. */
+  open: (input: { kind: TabKind; contentId: string; title: string; params?: Record<string, unknown> }) => void
+  /** Open a file tab, optionally at a line. */
+  openFile: (path: string, line?: number, name?: string) => void
+}
+
 export interface TabTypeSpec {
   kind: TabKind
   order?: number
-  render?: (props: { tab: TabModel }) => React.ReactNode
+  render?: (props: TabRenderProps) => React.ReactNode
 }
 
 export interface TabRegistry {
@@ -174,6 +188,8 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
 
   const activeProjectId = layout.activeProjectId ?? projects[0]?.id ?? null
   const project = projects.find((item) => item.id === activeProjectId)
+  /* R2.8: branch + change count for the status bar and the git tab badge. */
+  const git = useGitSummary(project?.path)
   const state: ProjectTabs =
     activeProjectId === null
       ? { tabs: [], activeTabId: null, closed: [], sidebar: { width: SIDEBAR_WIDTH.default, collapsed: false } }
@@ -439,6 +455,9 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
           >
             <Icon className="h-3 w-3" aria-hidden />
             <span className="max-w-[160px] truncate">{tab.title}</span>
+            {tab.kind === 'git' && git !== null && git.changes > 0 && (
+              <span className="rounded-full bg-primary/15 px-1 text-2xs leading-4 text-primary">{git.changes}</span>
+            )}
             <button
               type="button"
               aria-label="Close"
@@ -633,7 +652,24 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
       />
     )
   } else if (registry.get(activeTab.kind)?.render !== undefined) {
-    content = registry.get(activeTab.kind)!.render!({ tab: activeTab })
+    content = (
+      <Guarded
+        fallback={
+          <div className="grid h-full place-content-center gap-1 text-center text-xs text-muted-foreground">
+            <strong className="text-sm text-foreground">{activeTab.title}</strong>
+            <span>{t('common.crashed')}</span>
+          </div>
+        }
+      >
+        {registry.get(activeTab.kind)!.render!({
+          tab: activeTab,
+          project,
+          sessionId: project?.sessionIds[0],
+          open,
+          openFile,
+        })}
+      </Guarded>
+    )
   } else {
     content = (
       <div className="grid h-full place-content-center gap-2 text-center text-muted-foreground">
@@ -659,6 +695,20 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
         {breadcrumb}
         <div className="wb-scroll relative min-h-0 flex-1 overflow-auto">{content}</div>
         <div className="flex h-status shrink-0 items-center gap-3 border-t border-border bg-card px-3 text-2xs text-muted-foreground">
+          {git !== null && git.branch !== '' && (
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded px-1 hover:bg-accent"
+              title={t('status.git')}
+              onClick={() => open({ kind: 'git', contentId: 'git', title: t('tab.git') })}
+            >
+              <GitBranch className="h-3 w-3" aria-hidden />
+              <span className="max-w-[180px] truncate">{git.branch}</span>
+              {git.changes > 0 && <span className="text-primary">±{git.changes}</span>}
+              {git.behind > 0 && <span>↓{git.behind}</span>}
+              {git.ahead > 0 && <span>↑{git.ahead}</span>}
+            </button>
+          )}
           <span className="truncate">{project?.path ?? ''}</span>
           <span>{state.tabs.length} tabs</span>
           <span className="ml-auto flex gap-3">{activeTab?.kind === 'file' && <span>UTF-8</span>}</span>
