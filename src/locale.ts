@@ -33,6 +33,7 @@ export const zh: Dict = {
   'file.changed': '文件已变化，点击重载',
   'file.failed': '无法读取文件',
   'file.binary': '该文件不是 UTF-8 文本',
+  'file.gotoLine': '跳转到行号',
   'explorer.loading': '加载中…',
   'explorer.empty': '空目录',
   'explorer.failed': '无法列目录',
@@ -59,6 +60,7 @@ export const zh: Dict = {
   'browser.framingHint': '部分站点禁止被嵌入；打不开时请用系统浏览器打开。',
   'explorer.open': '打开',
   'explorer.copyPath': '复制路径',
+  'explorer.reveal': '在系统中打开',
   'markdown.preview': '预览',
   'markdown.source': '源码',
 }
@@ -92,6 +94,7 @@ export const en: Dict = {
   'file.changed': 'File changed on disk, click to reload',
   'file.failed': 'Could not read the file',
   'file.binary': 'Not a UTF-8 text file',
+  'file.gotoLine': 'Go to line',
   'explorer.loading': 'Loading…',
   'explorer.empty': 'Empty directory',
   'explorer.failed': 'Could not list the directory',
@@ -118,6 +121,7 @@ export const en: Dict = {
   'browser.framingHint': 'Some sites refuse to be framed; open them in the system browser instead.',
   'explorer.open': 'Open',
   'explorer.copyPath': 'Copy path',
+  'explorer.reveal': 'Reveal in system',
   'markdown.preview': 'Preview',
   'markdown.source': 'Source',
 }

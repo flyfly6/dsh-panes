@@ -29,7 +29,7 @@
 ## 4. Explorer tab
 
 - [x] 树：懒加载 `workspaceFiles.list`（`remote.workspaceFiles` 客户端接口）；折叠状态仅内存、忽略目录与类型图标未做。
-- [x] 右键菜单：打开 / 复制路径（实测两项均出现）；「在树中定位」「在系统打开」待补（后者需宿主 op）。
+- [x] 右键菜单：打开 / 复制路径 / 在系统中打开（宿主 `path.reveal` op：绝对路径 + 存在性校验，argv 直调 `open -R` / `explorer` / `xdg-open`，拒绝相对路径与不存在路径，实测返回 `bad-path` / `not-found`）。
 - [x] 单击打开 file tab（幂等，实测连点两次仍是一个 tab）。
 
 ## 5. Search tab
@@ -42,7 +42,7 @@
 
 ## 6. 代码视图
 
-- [x] 单页读取（≤800 行）、行号 gutter（shiki 模式用 CSS counter）、面包屑、换行开关；分页追加 / 当前行 / 缩进参考线 / `Ctrl+G` / `Alt+Z` 键位未做。
+- [x] 单页读取（≤800 行）、行号 gutter（shiki 模式用 CSS counter）、面包屑、换行开关（按钮 + `Alt+Z`）、`Ctrl+G` 跳行（复用 `.line` 定位 + 高亮）；分页追加 / 当前行 / 缩进参考线未做。
 - [x] shiki 初始化：`shiki/core` + JS regex engine，16 种语言 + GitHub Light/Dark 双主题，随宿主明暗（`class="dark"` / `data-ds-dark-theme`）用 MutationObserver 重渲染；超长行（>5k）与未知扩展名回退纯文本。实测 `.ts` 7 种 token 色、`.json` 159 个 token span。bundle gzip 305KB。
 - [ ] `changes` 订阅：外部修改提示「已变化，点击重载」（重载按钮已在，订阅未接）。
 
@@ -51,7 +51,7 @@
 - [x] markdown-it + GFM（table / task lists / strikethrough / footnotes / linkify）+ DOMPurify sanitize（raw HTML 关闭）；外链强制 `target=_blank rel=noreferrer`。
 - [x] 代码块用同一 shiki 实例高亮（渲染后原地替换 `pre code`）。
 - [x] 相对图片走宿主 `readBytes` → `URL.createObjectURL` blob（不暴露文件系统路径）；读不到时降级为 `[文件名]` 占位。
-- [x] 预览 / 源码切换（按钮 + `Ctrl+Shift+V`）；滚动位置记忆与 T3 复用组件未做。
+- [x] 预览 / 源码切换（按钮 + `Ctrl+Shift+V`）；按 tab 记忆滚动位置（切换回来恢复）；T3 复用组件未做。
 
 ## 8. 会话 / 终端 / 浏览器 tab
 

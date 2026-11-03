@@ -549,6 +549,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry }) {
         remote={remote}
         t={t}
         line={line}
+        scrollKey={activeTab.id}
       />
     ) : (
       <FileView

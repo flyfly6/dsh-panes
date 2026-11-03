@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { ChevronDown, ChevronRight, File, Folder } from 'lucide-react'
+import { call } from '../api'
 import { Button } from '../ui/button'
 import { cn } from '../ui/cn'
 import type { DirectoryEntry, Remote, Translate } from './types'
@@ -141,6 +142,16 @@ export function ExplorerView({ root, sessionId, remote, onOpen, t }: Props) {
             }}
           >
             {t('explorer.copyPath')}
+          </Button>
+          <Button
+            variant="ghost"
+            className="h-[24px] w-full justify-start px-2 text-xs font-normal"
+            onClick={() => {
+              void call('path.reveal', { path: `${root}/${menu.path}` }).catch(() => undefined)
+              setMenu(null)
+            }}
+          >
+            {t('explorer.reveal')}
           </Button>
         </div>
       )}

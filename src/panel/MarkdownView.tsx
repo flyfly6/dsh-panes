@@ -13,16 +13,22 @@ interface Props {
   remote: Remote
   t: Translate
   line?: number
+  /** Tab identity, so the preview comes back to where the user left it. */
+  scrollKey?: string
 }
+
+/** Remembered preview scroll offsets, per tab (survives tab switches). */
+const SCROLL = new Map<string, number>()
 
 type Mode = 'preview' | 'source'
 
 /** `.md`/`.mdx` renders as GFM by default; Ctrl+Shift+V or the toggle shows source. */
-export function MarkdownView({ path, sessionId, remote, t, line }: Props) {
+export function MarkdownView({ path, sessionId, remote, t, line, scrollKey }: Props) {
   const [mode, setMode] = React.useState<Mode>('preview')
   const [html, setHtml] = React.useState<string | null>(null)
   const [error, setError] = React.useState('')
   const container = React.useRef<HTMLDivElement>(null)
+  const scrollHost = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
     if (sessionId === undefined) {
@@ -55,6 +61,14 @@ export function MarkdownView({ path, sessionId, remote, t, line }: Props) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  // Restore the remembered offset once the preview is painted.
+  React.useEffect(() => {
+    if (html === null || scrollKey === undefined) return
+    const host = scrollHost.current
+    const saved = SCROLL.get(scrollKey)
+    if (host !== null && saved !== undefined) host.scrollTop = saved
+  }, [html, scrollKey])
 
   React.useEffect(() => {
     const element = container.current
@@ -94,7 +108,13 @@ export function MarkdownView({ path, sessionId, remote, t, line }: Props) {
           <Code2 className="h-3 w-3" aria-hidden /> {t('markdown.source')}
         </Button>
       </div>
-      <div className="wb-scroll min-h-0 flex-1 overflow-auto">
+      <div
+        className="wb-scroll min-h-0 flex-1 overflow-auto"
+        ref={scrollHost}
+        onScroll={(event) => {
+          if (scrollKey !== undefined) SCROLL.set(scrollKey, event.currentTarget.scrollTop)
+        }}
+      >
         {error !== '' ? (
           <div className="p-3 text-xs text-muted-foreground">{error}</div>
         ) : html === null ? (

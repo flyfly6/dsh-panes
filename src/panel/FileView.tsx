@@ -71,6 +71,29 @@ export function FileView({ path, sessionId, remote, t, line }: Props) {
     }
   }, [path, state, dark])
 
+  // Alt+Z toggles wrap; Ctrl+G jumps to a line (R1.11).
+  React.useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.altKey && event.key.toLowerCase() === 'z') {
+        event.preventDefault()
+        setWrap((value: boolean) => !value)
+        return
+      }
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'g') {
+        event.preventDefault()
+        const answer = window.prompt(t('file.gotoLine'))
+        const target = Number(answer)
+        if (answer === null || !Number.isFinite(target) || target < 1) return
+        const element = container.current?.querySelectorAll('.line')[target - 1] as HTMLElement | undefined
+        element?.scrollIntoView({ block: 'center' })
+        element?.classList.add('wb-line-active')
+        setTimeout(() => element?.classList.remove('wb-line-active'), 1200)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [t])
+
   // Reveal the requested line once content is painted (search hit / jump to line).
   React.useEffect(() => {
     if (line === undefined || state.status !== 'ready') return

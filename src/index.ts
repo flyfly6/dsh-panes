@@ -12,6 +12,9 @@
  *
  * Lifecycle is owned by `ctx.effect`, so disabling the plugin removes the route.
  */
+import { spawn } from 'node:child_process'
+import { stat } from 'node:fs/promises'
+import path from 'node:path'
 import { search } from './search'
 
 export const name = 'dsh-workbench'
@@ -93,6 +96,21 @@ export function createOps(readConfig: () => PluginConfig) {
     ping: () => ({ plugin: PLUGIN_ID, alive: true }),
     'config.get': () => readConfig(),
     search: (args: Json, signal?: AbortSignal) => search({ ...(args as any), signal }),
+    'path.reveal': async (args: Json) => {
+      const target = path.resolve(String(args.path ?? ''))
+      if (!path.isAbsolute(String(args.path ?? ''))) throw new ApiError('bad-path', 'path must be absolute')
+      const info = await stat(target).catch(() => null)
+      if (info === null) throw new ApiError('not-found', 'path does not exist', 404)
+      // ponytail: argv-only, platform opener; no shell string, no user args beyond the path.
+      const [command, ...rest] =
+        process.platform === 'darwin'
+          ? ['open', '-R', target]
+          : process.platform === 'win32'
+            ? ['explorer', target]
+            : ['xdg-open', path.dirname(target)]
+      spawn(command, rest, { detached: true, stdio: 'ignore' }).unref()
+      return { revealed: true }
+    },
   } as Record<string, (args: Json, signal?: AbortSignal) => unknown | Promise<unknown>>
 }
 
