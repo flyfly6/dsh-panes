@@ -22,13 +22,13 @@ search, terminal, source control and notes.
 
 | Tab | What it does |
 |---|---|
-| **Session** | The conversation for this project, embedded in the tab strip. One tab per session. |
-| **File** | Read-only code view with syntax highlighting (shiki), line numbers, breadcrumb, word wrap, `⌘G` jump-to-line, paged loading for large files, UTF-8 detection. |
-| **Explorer** | Directory tree: open, copy path, reveal in the system file manager. |
+| **Session** | A host conversation in the tab strip, one tab per session. A right dock holds **side chats** — forks of the main conversation (`⌥S`). |
+| **File** | Code view with syntax highlighting (shiki), line numbers, breadcrumb, word wrap, `⌘G` jump-to-line, paged loading for large files, UTF-8 detection — plus an inline editor (`⌘S` saves atomically, with etag conflict detection). |
+| **Explorer** | Tree on the left, its own internal tabs on the right, so browsing does not consume top-level tabs. Sort by name, jump to top/bottom, reveal in the system file manager. |
 | **Search** | Project-wide content search: regex, case sensitivity, globs, split result list + preview, hit counts, truncation flag. Uses the machine's `rg`, then the `rg` bundled with `@vscode/ripgrep`, then a bounded JS walk — and tells you which engine ran. |
 | **Terminal** | A real pty in the tab, via the host's `webTerminals` service, with fit-on-resize and live theme. |
 | **Source control** | The Git tool window: changes, staged/unstaged, commit box, commit history graph, diffs, branch actions (16 rail buttons, each switchable), AI-generated commit messages. |
-| **Notes** | A Notion-style Markdown vault: list + [BlockNote](https://www.blocknotejs.org/) editor, one `.md` per note, frontmatter preserved by the host, `.trash` on delete, etag-based conflict detection. |
+| **Notes** | A Notion-style Markdown vault: list + [BlockNote](https://www.blocknotejs.org/) editor, one `.md` per note, frontmatter preserved by the host, `.trash` on delete, etag-based conflict detection. Notes live in one folder per project (`_inbox` for unassigned ones) and can be moved between projects. |
 
 ![Session tab](assets/02-session.png)
 ![Code file tab](assets/03-code-file.png)
@@ -49,6 +49,17 @@ search, terminal, source control and notes.
   and the split collapses when its pane empties.
 - **Explorer became a split view too**: tree on the left, files in inner tabs on
   the right, with sorting and jump-to-top/bottom buttons.
+- **Tab actions** — rename inline (`F2` or double-click), a right-click menu with
+  close ranges / copy path / reveal, batch close behind one confirmation, drag
+  reorder with a drop marker, and `⌥⌘←/→` to move the active tab.
+- **The layout lives in the host** — persisted through the plugin's own route
+  (`layout.json` in the DSH home), with localStorage as the cache, so it comes
+  back after a port change or cleared site data. `⋯` → reset layout if it ever
+  gets stuck.
+- **Editable files** — the file tab has an inline editor that saves atomically
+  (`⌘S`) and refuses to clobber a file changed on disk (reload or overwrite).
+- **Side chats** — fork the current session into a dock on the right (`⌥S`),
+  several at a time, each its own conversation.
 - **Browser tab removed** — Electron `<webview>` is gated by the host, so the
   iframe could not open most sites; use the system browser.
 
@@ -78,16 +89,21 @@ Uninstall: remove it from `dsh.profile.bundles`, then
 
 ## Using it
 
-- The sidebar lists every workspace, with its open-tab count (or a `running`
-  dot when it has live sessions). `+` adds a project; the filter box narrows the
+- The sidebar lists every workspace with its open-tab count. `+` adds a project; the filter box narrows the
   list; the collapse button shrinks the sidebar to a 52px rail (automatic below
   820px of panel width).
-- `+` at the top right opens the **NEW TAB** menu: session, open file, explorer,
-  search, terminal, git, notes.
+- `+` at the top right opens the **NEW TAB** menu: new session, open file,
+  explorer, search, terminal, git, notes — then the project's recent sessions.
+- Tabs can be split into two panes (side by side or stacked) from the `⋯` menu;
+  each pane keeps its own strip, and a tab moves between panes from the same
+  menu. Double-click a tab to rename it, right-click for close-range, copy path
+  and reveal; drag to reorder.
 - Tabs are scoped to the project: switching project switches the whole tab set.
-  Each project's layout is persisted.
-- The status bar shows branch + changed-file count (`±n`, click opens Git), live
-  session count, cursor line/column, encoding, language and light/dark.
+  Each project's layout is persisted (in the host profile, so it survives a
+  port change or cleared site data).
+- The status bar shows branch + changed-file count (`±n`, click opens Git), the
+  project's open-tab count, cursor line/column, encoding, language, and a
+  light/dark toggle.
 
 Keyboard (the panel only — a focused editor or terminal keeps its own keys):
 
@@ -100,6 +116,11 @@ Keyboard (the panel only — a focused editor or terminal keeps its own keys):
 | `⌘⇧T` | Reopen the last closed tab |
 | `⌘B` | Collapse / expand the project sidebar |
 | `Tab` / `⇧Tab` | Cycle tabs |
+| `F2` | Rename the focused tab |
+| `⇧F10` | Tab context menu |
+| `⌥⌘←` / `⌥⌘→` | Move the tab left / right |
+| `←` / `→` | Move focus between tabs |
+| `⌥S` | Toggle the side-chat dock (session tabs) |
 | `Esc` | Close the panel |
 
 Per view: `⌘G` jump to line (file), `⌘⇧V` preview/source (Markdown), `⌘S` save (note).
@@ -168,11 +189,13 @@ profile needs a client restart.
 
 ## Known limits
 
-- **Read-only for code**: no editor or write-back, no LSP. Notes are the only
-  writable surface.
-- **`Add project` cannot register a workspace**: the client half exposes
-  `workspaces.model` but no `add`. The row and the `+` entry report that refusal
-  instead of pretending.
+- **The code editor is plain**: a textarea with save and conflict detection —
+  no syntax highlighting while editing, no completion, no LSP, and closing the
+  tab does not prompt about unsaved changes.
+- **Side chats are read-only mirrors**: the client can read a session's events
+  but has no composer write entry, so quoting a selection back into the fork is
+  not implemented. A fork also needs a completed turn to split from, so a brand
+  new session cannot be forked yet.
 - **Search and notes act on client-supplied absolute paths**, fenced by the
   plugin header + same-origin check rather than by "must be inside a registered
   workspace" (the host exposes no workspace list to the host half). Treat the

@@ -322,6 +322,7 @@ function SessionTabView({
   const [side, setSide] = React.useState<string | undefined>(() => readSides(sessionId)[0])
   const [dock, setDock] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
+  const [forkFailed, setForkFailed] = React.useState(false)
 
   const update = (next: string[]) => {
     setSides(next)
@@ -333,6 +334,7 @@ function SessionTabView({
     setBusy(true)
     try {
       const created = await forkSession(sessionId)
+      setForkFailed(created === undefined)
       if (created === undefined) return
       update([...sides, created])
       setSide(created)
@@ -385,7 +387,11 @@ function SessionTabView({
         )}
       </div>
       {dock && (
-        <aside className="flex w-[380px] shrink-0 flex-col border-l border-border" aria-label={t('side.title')}>
+        /* Proportional so a squeezed (split) pane keeps its conversation readable. */
+        <aside
+          className="flex w-2/5 max-w-[380px] min-w-[220px] shrink-0 flex-col border-l border-border"
+          aria-label={t('side.title')}
+        >
           <div className="flex h-tab shrink-0 items-center gap-1 border-b border-border px-1.5">
             <span className="shrink-0 text-2xs uppercase tracking-wide text-muted-foreground">{t('side.title')}</span>
             <div className="wb-scroll flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
@@ -438,6 +444,7 @@ function SessionTabView({
             ) : (
               <div className="grid h-full place-content-center gap-2 px-4 text-center text-xs text-muted-foreground">
                 <span>{t('side.empty')}</span>
+                {forkFailed && <span className="text-warning">{t('side.forkFailed')}</span>}
                 <Button
                   variant="outline"
                   size="sm"
@@ -1284,7 +1291,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
                     icon={<KindIcon kind="session" />}
                     onSelect={() => open({ kind: 'session', contentId: sessionId, title: t('tab.session') })}
                   >
-                    <span className="truncate">{`${t('tab.session')} · ${sessionId.slice(0, 8)}`}</span>
+                    <span className="truncate">{`${t('tab.session')} · ${sessionId.replace(/^session-/, '').slice(0, 8)}`}</span>
                   </DropdownMenuItem>
                 ))}
               </>

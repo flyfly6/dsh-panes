@@ -170,7 +170,8 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
     try {
       const created = await service.forkSession(sessionId)
       return typeof created === 'string' && created !== '' ? created : undefined
-    } catch {
+    } catch (error) {
+      console.warn('[dsh-panes] forkSession failed', error)
       return undefined
     }
   }
