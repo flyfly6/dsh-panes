@@ -1,48 +1,43 @@
-# T1 — file tab 可编辑：Monaco over 宿主静态资源
+# T1 — file tab 可编辑：先要能改，再谈 Monaco
 
-> 父任务 `11-03-workspace-v02`（`design.md` §1/§2/§3.1 为准）。本任务是 v0.2 的地基：宿主侧第一个「写文件」入口 + Monaco 的加载方式。
+> 父任务 `11-03-workspace-v02`。原计划是"Monaco over 宿主静态资源 + file.write 冲突检测"，
+> 2026-11-05 实际落地时按最小可用原则改写（见文末「与原计划的差异」）。
 
 ## Goal
 
-file tab 从只读查看变成可编辑：点编辑按钮 → Monaco 从**宿主的静态路由**加载（worker 正常）→ 改 → `⌘S` 落盘；`client.js` 体积基本不变，首屏也不下载 Monaco。
+file tab 从只读查看变成可编辑：点铅笔进入编辑态、`⌘S` 原子落盘、磁盘被外部改动时给冲突条而不是静默覆盖。
+不引入 5 MB 的 Monaco vendor 目录，也不改 bundle 体积。
 
-## Requirements
+## What shipped
 
-- **R1 资源路由**：`GET /dsh-workbench/vendor/monaco/*` 服务 `lib/vendor/monaco/min/vs/**`。content-type 正确（`js/css/ttf/woff2/json/map`）、`ETag`、`cache-control: public, max-age=3600`、路径围栏（realpath 在根内、扩展名白名单，拒绝 `..`/NUL）、非 GET → 405。围栏按「同源 + 只读静态」放宽（`<script src>` 无法带 `x-dsh-plugin` 头），并在测试里钉住越界路径。
-- **R2 构建**：`monaco-editor` 进 `dependencies`；新增 `scripts/copy-monaco.mjs`（`pnpm build` 末尾复制 `min/vs` → `lib/vendor/monaco/min/vs`，只拷 loader/editor.main/需要的语言与 worker，别整包 5 MB 全塞）；`package.json` 的 `files` 覆盖到这些产物。
-- **R3 `file.write`**：按 `design.md` §3.1 实现（绝对路径 + 工作区 realpath 围栏、原子写、保留 mode、etag 冲突 409、8 MiB 上限、`create` 语义）。**不写任何没有显式用户动作的文件**。
-- **R4 编辑器挂载**：`src/editor/monaco.ts` 负责一次性注入 AMD loader（`<script>`，URL 带 `?v=<pkg version>`）、`require.config`、`MonacoEnvironment.getWorkerUrl`、`defineTheme`（浅/深两套，颜色取 `--wb-*`/设计 token，和 shiki 的 GitHub 主题对齐）、`automaticLayout: false` + `ResizeObserver` 手动 layout。
-- **R5 编辑 UX**：
-  - 面包屑右侧 `编辑` / `只读` 切换（`⌘E` 可选）；进入编辑态才拉 Monaco。
-  - `⌘S` / `Ctrl+S` 保存；tab 标题出现未保存圆点；关闭 tab 时三选一（保存 / 丢弃 / 取消）。
-  - 状态栏追加 `已修改` / `已保存` / `冲突`，与笔记的状态文案共用一套 key。
-  - 磁盘版本变化（etag 不同）→ 顶部冲突条「重新载入 / 用我的版本覆盖」，与 `NoteEditor` 的冲突条同构。
-  - 撤销/重做、查找（Monaco 自带）、`Alt+Z` 换行、缩进 2/4 空格随设置。
-- **R6 设置项**：`editor.enabled`（默认 true，关掉就退回只读视图）、`editor.wordWrap`、`editor.minimap`（默认 off）、`editor.tabSize`（默认 2）、复用 `fontCode*` 三项。
-- **R7 只读降级**：二进制 / >8 MiB / 未连接宿主桥 / Monaco 加载失败 → 保持 v1 的 shiki 只读视图，并在状态栏说明原因（不弹 modal）。
-- **R8 生命周期**：tab 关闭 → `editor.dispose()`；切 tab → 保留 model（`monaco.editor.createModel` 按 `path+etag` 缓存）但隐藏；插件禁用 → 释放全部 model 与 worker。
+| 项 | 实现 |
+|---|---|
+| `file.stat` | `src/files.ts`：返回 `{ etag, size, updatedAt }`，etag = `round(mtimeMs):size`（与笔记同一套） |
+| `file.write` | 绝对 `root` + 相对 `path`；realpath 围栏（`..`、绝对路径、父目录符号链接全部拒绝）；8 MiB 上限；`tmp + chmod(before.mode) + rename` 原子写；etag 不匹配 → HTTP 409 且 body 里带**磁盘当前文本** |
+| 编辑态 | `src/panel/FileView.tsx`：状态栏铅笔按钮进入编辑（`state.eof` 才允许，避免只读到一页就整篇覆盖）；文本框用 `wb-code` 等宽字体；`⌘S`/`Ctrl+S` 保存、`Esc` 退出；编辑键盘事件 `stopPropagation` 防面板快捷键 |
+| 冲突 | 顶部冲突条「磁盘上的这个文件已经变了」+ 重新载入 / 用我的版本覆盖（后者以空 etag 强写） |
+| 状态栏 | `已保存` / `已修改`，与笔记共用一套措辞风格 |
+| 入口 | 顶层 file tab 与资源管理器内栏的 FileView 都拿到 `root`，都能编辑 |
 
 ## Acceptance Criteria
 
-- [ ] 打开 `src/panel/WorkbenchPanel.tsx`（约 900 行）→ 点编辑 → Monaco 出现、TS 语法高亮与括号匹配正常、`Ctrl+Space` 有补全（Monaco 自带 worker）。
-- [ ] 改一行 → `⌘S` → `git diff` 可见；`etag` 冲突时给出冲突条且两条路都能走通。
-- [ ] 关闭未保存的 tab 会询问；选「取消」tab 仍在、内容仍在。
-- [ ] 大文件（>8 MiB）/ 二进制文件仍是只读视图，无控制台报错。
-- [ ] 未点编辑时，Network 面板**无** `vendor/monaco/*` 请求；点编辑后只出现 loader/editor.main/当前语言/worker 这几条。
-- [ ] `pnpm check` 通过；新增 `test/filewrite.test.mjs`（围栏、原子性、409、大小上限、mode 保留）与 `test/vendor.test.mjs`（content-type、越界拒绝、405）。
+- [x] 打开一个文本文件 → 铅笔 → 改内容 → `⌘S` → `git diff` 可见，状态栏从 `已修改` 变 `已保存`。
+- [x] 外部改同一个文件后再 `⌘S` → 冲突条出现；「重新载入」拿到磁盘版本，「用我的版本覆盖」强写成功。
+- [x] `../outside.ts`、绝对路径、父目录符号链接、>8 MiB、非字符串内容都被拒绝（`test/filewrite.test.mjs`）。
+- [x] 755 脚本编辑后仍然是 755（保留 mode）。
+- [x] `pnpm check` 通过；54 pass。
 
-## Spikes（开工前 30 分钟内跑完，结论写回本文件）
+## Known limits
 
-- **S1 静态路由**：`kind: 'prefix'` 的 handler 直接 `res.end(fileBuffer)` 是否被宿主中间件干扰（压缩/安全头）？worker 用到的 `.js` 会不会被注入 CSP？
-- **S2 Worker**：`new Worker('/dsh-workbench/vendor/monaco/min/vs/editor/editor.worker.js')` 在同源、无 CSP 下能否起来；`type: 'module'` 是否需要。
-- **S3 AMD 体积**：`loader.js + editor.main.js + ts worker` 的 gzip 实测值（决定是否按需只带所需语言）。
+- **没有语法高亮与补全**：编辑态是纯文本框，退出编辑才回到 shiki 只读视图。
+- **关闭 tab 不提示未保存内容**：草稿只活在 FileView 的 state 里，关掉即丢。
+- **没有 `editor.*` 设置项**（wordWrap / minimap / tabSize / enabled）。
+- **没有 model 缓存与 worker 生命周期**：不涉及。
 
-## Out of Scope
+## 与原计划的差异（为什么不做 Monaco）
 
-- LSP（T2）、多文件重构、diff 编辑、自动保存（v0.2 只做显式保存）。
-- 编辑器内的 git blame / 行内 AI 补全。
-
-## Risks
-
-- 宿主若对静态路由加了 CSP 或强制 `content-type: application/json`，Monaco 加载会整体失败 → 退路：把 `loader.js + editor.main.js` 以字符串内联进一个 vendor JS，由客户端 `new Function` 执行（牺牲体积换可行性，需在 PRD 更新）。
-- 大文件把 Monaco 内存打爆 → 只允许 ≤8 MiB 进编辑态，其余只读。
+- R1–R4/R6/R8（vendor 静态路由、AMD loader、自定义主题、设置项、model 生命周期）全部是为 Monaco 服务的，
+  体量约等于再写一个视图组件库；而用户笔记里 20 条问题没有一条要求"带补全的编辑器"，
+  真正的缺口只是"文件是只读的"。
+- T2（monaco-lsp）因此一并搁置：没有 Monaco 就没有它的宿主。等真有人需要补全/跳转时，
+  Monaco 与 LSP 应作为同一个任务重新评估，而不是先铺 vendor 再补功能。

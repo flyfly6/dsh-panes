@@ -1230,6 +1230,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
         line={line}
         stamp={stamp}
         onCursor={setCursor}
+        root={project?.path}
       />
     )
   } else if (tab.kind === 'explorer') {

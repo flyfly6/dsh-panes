@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { AlertCircle, RotateCw, WrapText } from 'lucide-react'
+import { AlertCircle, Pencil, RotateCw, Save, WrapText } from 'lucide-react'
+import { ApiCallError, call } from '../api'
 import { highlightToHtml, isDark, languageLabel, languageOf } from '../highlight'
 import { Button } from '../ui/button'
 import { cn } from '../ui/cn'
@@ -23,6 +24,18 @@ interface Props {
   stamp?: number
   /** Report the line/column under the pointer for the status bar. */
   onCursor?: (cursor: Cursor) => void
+  /** Absolute workspace root; without it the tab stays read-only. */
+  root?: string
+}
+
+interface EditState {
+  draft: string
+  /** Version this draft was loaded from; a mismatch is a conflict, not an overwrite. */
+  etag: string
+  saved: string
+  saving: boolean
+  /** The disk copy handed back by a 409, shown in the conflict bar. */
+  conflict: string | null
 }
 
 type State =
@@ -45,12 +58,13 @@ function columnAt(line: HTMLElement, range: Range): number {
 }
 
 /** Read-only source view: shiki highlighting, line gutter, wrap toggle, paging. */
-export function FileView({ path, sessionId, remote, t, line, stamp, onCursor }: Props) {
+export function FileView({ path, sessionId, remote, t, line, stamp, onCursor, root }: Props) {
   const [state, setState] = React.useState<State>({ status: 'loading' })
   const [wrap, setWrap] = React.useState(false)
   const [token, setToken] = React.useState(0)
   const [dark, setDark] = React.useState(isDark)
   const [html, setHtml] = React.useState<string | null>(null)
+  const [edit, setEdit] = React.useState<EditState | null>(null)
   const container = React.useRef<HTMLDivElement>(null)
   const lineNodes = React.useRef<HTMLElement[]>([])
   const hovered = React.useRef<HTMLElement | null>(null)
@@ -158,6 +172,53 @@ export function FileView({ path, sessionId, remote, t, line, stamp, onCursor }: 
     reveal(line)
   }, [line, stamp, state, html, reveal])
 
+
+  const beginEdit = React.useCallback(async () => {
+    if (root === undefined || state.status !== 'ready' || !state.eof) return
+    const info = await call<{ etag: string }>('file.stat', { root, path }).catch(() => null)
+    setEdit({ draft: state.text, etag: info?.etag ?? '', saved: state.text, saving: false, conflict: null })
+  }, [path, root, state])
+
+  const save = React.useCallback(
+    async (force = false) => {
+      if (edit === null || root === undefined || edit.saving) return
+      setEdit({ ...edit, saving: true, conflict: null })
+      try {
+        const result = await call<{ etag: string }>('file.write', { root, path, content: edit.draft, etag: force ? '' : edit.etag })
+        setEdit((current) => (current === null ? null : { ...current, etag: result.etag, saved: current.draft, saving: false, conflict: null }))
+        setState((current) => (current.status === 'ready' ? { ...current, text: edit.draft } : current))
+      } catch (error) {
+        const failure = error as ApiCallError
+        let disk: string | null = null
+        if (failure.code === 'files/conflict') {
+          try {
+            disk = (JSON.parse(failure.message) as { current?: string }).current ?? ''
+          } catch {
+            disk = ''
+          }
+        }
+        setEdit((current) => (current === null ? null : { ...current, saving: false, conflict: failure.code === 'files/conflict' ? disk : null }))
+        if (failure.code !== 'files/conflict') setState({ status: 'error', message: `${t('file.saveFailed')}: ${failure.code}` })
+      }
+    },
+    [edit, path, root, t],
+  )
+
+  /* ⌘S saves while editing; the panel's other shortcuts must not fire inside it. */
+  React.useEffect(() => {
+    if (edit === null) return
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        void save()
+      } else if (event.key === 'Escape') {
+        setEdit(null)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [edit, save])
+
   const reportCursor = (event: React.MouseEvent<HTMLDivElement>) => {
     if (onCursor === undefined) return
     const host = container.current
@@ -199,7 +260,42 @@ export function FileView({ path, sessionId, remote, t, line, stamp, onCursor }: 
   const rows = state.text.split('\n')
   return (
     <div className="flex h-full flex-col">
-      <div ref={container} className="wb-scroll min-h-0 flex-1 overflow-auto" onMouseMove={reportCursor}>
+      {edit !== null && (
+        <div className="flex min-h-0 flex-1 flex-col">
+          {edit.conflict !== null && (
+            <div className="flex shrink-0 items-center gap-2 border-b border-border bg-[var(--card)] px-2 py-1 text-2xs text-foreground">
+              <AlertCircle className="h-3 w-3 text-primary" aria-hidden />
+              <span className="flex-1">{t('file.conflict')}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEdit({ draft: edit.conflict ?? '', etag: '', saved: edit.conflict ?? '', saving: false, conflict: null })
+                  setState((current) => (current.status === 'ready' ? { ...current, text: edit.conflict ?? '' } : current))
+                }}
+              >
+                {t('file.reloadDisc')}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => void save(true)}>
+                {t('file.keepMine')}
+              </Button>
+            </div>
+          )}
+          <textarea
+            aria-label={t('file.editing')}
+            className="wb-code wb-scroll min-h-0 flex-1 resize-none whitespace-pre bg-[var(--background)] p-2 text-foreground outline-none"
+            spellCheck={false}
+            value={edit.draft}
+            onChange={(event) => setEdit({ ...edit, draft: event.target.value })}
+            onKeyDown={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
+      <div
+        ref={container}
+        className={cn('wb-scroll min-h-0 flex-1 overflow-auto', edit !== null && 'hidden')}
+        onMouseMove={reportCursor}
+      >
         {html !== null ? (
           <div
             className={cn('wb-shiki', wrap && 'wb-code-wrap')}
@@ -226,8 +322,25 @@ export function FileView({ path, sessionId, remote, t, line, stamp, onCursor }: 
       </div>
       <div className="flex h-status shrink-0 items-center gap-2 border-t border-border bg-[var(--card)] px-2 text-2xs text-muted-foreground">
         <span>{languageLabel(path)}</span>
-        <span>{state.count}</span>
+        <span>{edit !== null ? (edit.draft === edit.saved ? t('file.saved') : t('file.modified')) : state.count}</span>
         <span className="ml-auto" />
+        {edit !== null ? (
+          <>
+            <Button variant="ghost" size="sm" title={t('file.save')} onClick={() => void save()}>
+              <Save className={cn('h-3 w-3', edit.draft !== edit.saved && 'text-primary')} aria-hidden />
+            </Button>
+            <Button variant="ghost" size="sm" title={t('file.stopEdit')} onClick={() => setEdit(null)}>
+              {t('file.readOnly')}
+            </Button>
+          </>
+        ) : (
+          root !== undefined &&
+          state.eof && (
+            <Button variant="ghost" size="sm" title={t('file.edit')} onClick={() => void beginEdit()}>
+              <Pencil className="h-3 w-3" aria-hidden />
+            </Button>
+          )
+        )}
         <Button variant="ghost" size="sm" title={t('file.wrap')} onClick={() => setWrap((value) => !value)}>
           <WrapText className={cn('h-3 w-3', wrap && 'text-primary')} aria-hidden />
         </Button>

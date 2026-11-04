@@ -50,3 +50,10 @@
 
 - 长轮询模式在 150ms 下对 `didChange` 高频输入有延迟 → 输入时只发全量 `didChange`，hover/definition 才走实时请求；必要时把轮询降到 80ms 并只在有未读消息时忙轮询。
 - 用户填的命令跑飞（死循环/吃内存）→ 只做 `maxServers` 与 idle 回收，不做 CPU 限额（在 README 写明）。
+
+## 2026-11-05 搁置说明
+
+T1 落地时改用"文本框 + `file.write`"而不是 Monaco（理由见 `../11-03-monaco-editor/prd.md`）。
+本任务的宿主前提（Monaco 的 worker、model、`editor.*` 设置）不存在，因此一并搁置，不单独开工。
+真要做补全/跳转时，把 T1+T2 合成一个任务重新设计：要么完整接 Monaco（含 vendor 路由与 worker），
+要么接宿主自己的语言服务（若宿主未来暴露），不要在文本框上自己写 LSP 客户端。

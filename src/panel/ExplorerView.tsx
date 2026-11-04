@@ -244,7 +244,7 @@ export function ExplorerView({ root, sessionId, remote, onOpen, t }: Props) {
             </div>
             <div className="min-h-0 flex-1">
               {active !== undefined && sessionId !== undefined ? (
-                <FileView key={active.path} path={active.path} sessionId={sessionId} remote={remote} t={t} />
+                <FileView key={active.path} path={active.path} sessionId={sessionId} remote={remote} t={t} root={root} />
               ) : (
                 <div className="grid h-full place-content-center text-2xs text-muted-foreground">{t('panel.noBridge')}</div>
               )}
