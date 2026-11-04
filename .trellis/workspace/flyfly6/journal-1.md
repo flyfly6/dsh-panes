@@ -66,3 +66,41 @@
 ### Next Steps
 
 - v0.2 规划已建档（11-03-workspace-v02 等），尚未开工
+
+
+## Session 2: Bootstrap: fill project spec (backend + frontend)
+<!-- trellis-session: v=2 fp=d2c245644e629ddd -->
+
+**Date**: 2026-11-04
+**Task**: Bootstrap: fill project spec (backend + frontend)
+**Branch**: `main`
+
+### Summary
+
+把 .trellis/spec/ 的 11 个模板文件按 dsh-panes 真实代码填满，归档 00-bootstrap-guidelines。
+
+### Main Changes
+
+- backend spec：两个半边与 op 表、无数据库的持久化规则（layout schemaVersion / notes etag）、ApiError+NotesError 信封与信任围栏、console+[dsh-panes] 日志约定、pnpm check 门禁
+- frontend spec：src 分区与新增 tab kind 的四处改动、CJS factory 下必须的 React 命名空间导入、Tailwind token + preflight off、模块 store + useX 绑定、strict 类型的边界归一化
+- 两个 index.md 状态列改为 Filled，prd.md 三处 checklist 打勾
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3d7c246` | docs(spec): fill dsh-panes project guidelines |
+| `6ab305e` | chore(task): archive 00-bootstrap-guidelines |
+
+### Testing
+
+- [OK] [OK] .trellis/spec 内部链接 0 断链，占位符 0 残留
+- [OK] [SKIP] 未跑 pnpm check：本次仅改 Markdown，无代码改动
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- v0.2 任务（11-03-workspace-v02 及其子任务）尚未开始实施
