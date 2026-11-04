@@ -21,9 +21,14 @@ the rest conversationally.
 
 ## Status (update the checkboxes as you complete each item)
 
-- [ ] Fill backend guidelines
-- [ ] Fill frontend guidelines
-- [ ] Add code examples
+- [x] Fill backend guidelines
+- [x] Fill frontend guidelines
+- [x] Add code examples
+
+Filled 2026-11-04 from the code at `main` / v0.1.1 — every file cites real paths
+(`src/index.ts`, `src/tabs.ts`, `src/notes.ts`, `src/panel/FileView.tsx`,
+`src/git/status.ts`, …) and records what the code does, including the gaps
+(`workspaces.add` absent, no DB, no ESLint/Prettier config).
 
 ---
 
