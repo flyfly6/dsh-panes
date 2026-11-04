@@ -44,9 +44,9 @@ v0.2 PRD 记的"客户端没有注册工作区的 API"不再成立：实测客�
 | B 笔记 | 完成（遗留见 1、2） | 40ef975 |
 | F 移除浏览器 tab | 完成 | c5c0459 |
 | E 资源管理器分栏 | 完成 | 0bd0134 |
-| C tab 与会话 | 未开始 | — |
-| D 外壳与导航 | 未开始 | — |
-| G 品牌与发布 | 未开始 | — |
+| C tab 与会话 | 完成 | 0e9434f |
+| D 外壳与导航 | 完成（4 项宿主缺口） | ddebde8 |
+| G 品牌与发布 | 完成（截图/发布待用户） | 0b03e0b |
 
 C 组的调研已经做完（`research/session-tabs.md`）：客户端 `ctx.uiWorkspace.startSession` / `connectWorkspace`
 是宿主"新建会话"的入口，`sessions` 只负责 retain。实施时先做一次 spike 确认能否拿到新会话 id，
@@ -55,3 +55,28 @@ C 组的调研已经做完（`research/session-tabs.md`）：客户端 `ctx.uiWo
 ### 9. E 组按修改时间排序缺失（已记录）
 
 `workspaceFiles.list` 只回 `{name, type}`，没有 mtime；排序先做名称双向 + 目录优先，mtime 排序需要宿主接口扩展。
+
+## 2026-11-05 收尾
+
+### 10. D 组的四个宿主缺口（需要宿主接口，插件无法自修）
+
+- **隐藏左上角「切换侧栏」「新建会话」**：客户端没有开关；按钮在宿主 leading seat 里，class 是构建期哈希的 CSS Module。插件要用 DOM/CSS 硬改，违反"插件不改宿主 UI"，故不改。
+- **双击标题栏最大化**：窗口由宿主以 `titleBarStyle: hiddenInset` 创建，拖拽区在宿主 DOM 内。
+- **侧栏底部头像 + 用户名**：客户端服务目录里没有账户/身份服务。
+- **应用在 tab 内打开**：需要宿主把 `main` 面板作为子面板渲染，宿主未暴露该入口；现在点应用仍跳到宿主面板。
+
+### 11. C 组三处限制
+
+- 历史会话列表只显示 `会话 · <id8>`：客户端拿不到会话标题列表（宿主 `sessionTitle` 只在宿主侧）。
+- 跨栏只能菜单移动，不能拖拽跨栏。
+- 滚动容器按形状定位 + 轮询 3 秒；宿主暴露滚动容器后应替换。
+
+### 12. G 组待用户执行
+
+- 六张截图还是 0.1.1 界面（含已删除的 browser tab、旧字号），需要在本机重截。
+- `npm publish` 与市场上架需要凭证；`prepublishOnly` 会跑 `pnpm build`。
+
+### 13. v0.2 的六个子任务仍未动
+
+`11-03-monaco-editor`、`11-03-monaco-lsp`、`11-03-side-conversation`、`11-03-session-restore`、`11-03-tab-actions`、`11-03-git-tab-native` 仍是 planning。
+它们与本轮 v0.3 有交叠（tab 重命名、启动恢复），但体量是各自独立功能（Monaco/LSP/侧聊需要宿主静态路由、进程管理、会话 fork），需要后续按它们自己的 PRD 逐个推进。
