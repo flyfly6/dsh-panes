@@ -58,8 +58,8 @@ import { isNoteDirty, noteStatusOf, subscribeNoteStatus } from '../notes/store'
 import { isDark, languageLabel } from '../highlight'
 import type { PanelProps, Project, Translate } from './types'
 
-const STORE_KEY = 'dsh-workbench:layout'
-const LAST_PANEL_KEY = 'dsh-workbench:last-panel'
+const STORE_KEY = 'dsh-panes:layout'
+const LAST_PANEL_KEY = 'dsh-panes:last-panel'
 
 /** What a registered tab type gets to draw its body. */
 export interface TabRenderProps {
@@ -342,6 +342,10 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
       } else if (key === 'f' && event.shiftKey) {
         event.preventDefault()
         open({ kind: 'search', contentId: 'search', title: t('tab.search') })
+      } else if (key === 'n' && event.shiftKey) {
+        event.preventDefault()
+        const sessionId = project?.sessionIds[0]
+        if (sessionId !== undefined) open({ kind: 'session', contentId: sessionId, title: t('tab.session') })
       } else if (key === 'w' && activeTab !== undefined) {
         event.preventDefault()
         closeOne(activeTab.id)
@@ -358,7 +362,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [activeProjectId, activeTab, close, closeOne, open, state.tabs, state.activeTabId, t])
+  }, [activeProjectId, activeTab, close, closeOne, open, project?.sessionIds, state.tabs, state.activeTabId, t])
 
   const newTabItems: { kind: TabKind | 'openFile' | 'newProject'; label: string; hint?: string; icon: React.ReactNode }[] = [
     { kind: 'session', label: t('tab.session'), hint: '⌘⇧N', icon: <KindIcon kind="session" /> },

@@ -169,7 +169,7 @@ into our own bundle (done for `dsh-ide-git` → `src/git/panel.js`, see
    adapter and leaves the UI untouched.
 4. **Rename the config namespaces, not the API route**: row config namespace =
    *our* loader row id (`workbench`), settings-card key = *our* package name
-   (`dsh-workbench`), locale namespace = a fresh one. The HTTP prefix can stay
+   (`dsh-panes`), locale namespace = a fresh one. The HTTP prefix can stay
    upstream's (`/dsh-ide-git/api`) — it is not user-visible.
 5. **Add `*.d.ts` siblings** for the vendored `.js` (`allowJs` is off, so tsc
    ignores the file and reads your hand-written surface).
@@ -211,7 +211,7 @@ Two more rules that come from this:
 - **Evaluate the heavy module lazily**: `React.lazy(() => import('./notes/NoteEditor'))`.
   The download is still at boot (one file), but a module-eval failure then costs
   one tab instead of the whole panel — and it turns an opaque boot error into a
-  catchable stack you can read off `window.__workbenchLastError`.
+  catchable stack you can read off `window.__panesLastError`.
 
 ## Row config values are volatile refs, not values
 

@@ -1,6 +1,6 @@
 import * as React from 'react'
 /**
- * dsh-workbench — browser half entry.
+ * dsh-panes — browser half entry.
  *
  * The file is bundled as CJS and wrapped into the client-modules factory form by
  * scripts/wrap-client.mjs, so it must export the cordis plugin (`name`, `inject`,
@@ -23,7 +23,7 @@ const NoteEditorLazy = React.lazy(async () => {
   return { default: module.NoteEditor }
 })
 
-const PLUGIN_ID = 'dsh-workbench'
+const PLUGIN_ID = 'dsh-panes'
 const PANEL_KEY = 'workbench'
 
 /** `dir/some-note.md` -> `some-note`, the tab label before the note loads a title. */
@@ -107,7 +107,7 @@ function appearanceOf(config: Record<string, unknown>): Appearance {
 }
 
 export function apply(ctx: any, config: Record<string, unknown> = {}): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-workbench: locale')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-panes: locale')
   const t = ctx.locale.bind(NS)
   /**
    * Add project (R1.3): the host owns the workspace registry and its directory
@@ -157,7 +157,7 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
     restoreHostSidebar()
     ctx.layout.selectPanel(null)
   }
-  ctx.effect(() => installStyles(), 'dsh-workbench: styles')
+  ctx.effect(() => installStyles(), 'dsh-panes: styles')
 
   // T2/T3 add their tab types through this service.
   const registry: TabRegistry = createRegistry()
@@ -178,7 +178,7 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
         <GitTab ctx={ctx} cwd={project?.path ?? ''} sessionId={sessionId} />
       ),
     })
-  }, 'dsh-workbench: git tab')
+  }, 'dsh-panes: git tab')
 
   // T3: the notes vault is global (it lives outside every workspace), so both
   // tabs take no project path at all.
@@ -203,7 +203,7 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
       offNote()
       offList()
     }
-  }, 'dsh-workbench: notes tabs')
+  }, 'dsh-panes: notes tabs')
 
   const apps = () => {
     try {
@@ -247,13 +247,13 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
           WorkbenchPanel,
         ),
       ),
-    'dsh-workbench: workbench panel',
+    'dsh-panes: workbench panel',
   )
 
   // Embedded Session tab body: the host conversation factory inside the slot's provider.
   ctx.effect(
     () => ctx.slots.inject('workbench.conversation', () => ctx.slots.register({ name: 'workbench.conversation' }, ConversationSlot)),
-    'dsh-workbench: session conversation',
+    'dsh-panes: session conversation',
   )
 
   ctx.effect(
@@ -261,7 +261,7 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
       ctx.slots.inject('sidebar.panellist', () =>
         ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_KEY, order: 40, label: () => t('panel.title') }, PanelIcon),
       ),
-    'dsh-workbench: sidebar launcher',
+    'dsh-panes: sidebar launcher',
   )
 
   /* D10 / R11: `workspace` always lands here, `last` only when this panel was
@@ -277,6 +277,6 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
         /* layout not ready: the sidebar row still works */
       }
     }, 300)
-    ctx.effect(() => () => clearTimeout(timer), 'dsh-workbench: startup panel')
+    ctx.effect(() => () => clearTimeout(timer), 'dsh-panes: startup panel')
   }
 }

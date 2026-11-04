@@ -1,6 +1,6 @@
 # Upstream: dsh-ide-git
 
-**Status (2026-11-03): 分叉维护中 — 不再同步上游。** 这棵树是 `dsh-workbench`
+**Status (2026-11-03): 分叉维护中 — 不再同步上游。** 这棵树是 `dsh-panes`
 自己的 Git 面板基线；此文件只记录**来源、署名与我们的变更**。样式对齐与按需重构见
 `.trellis/tasks/11-03-git-tab-native/prd.md`（T6）。
 
@@ -20,7 +20,7 @@ since 2026-11-03 the tree is ours, so new changes are recorded here only.
 ## Host half (`src/git/host.js`)
 
 1. **Row config moved out.** Upstream exports a schemastery `Config` for its own
-   loader row. We mount it *inside* `dsh-workbench` (`ctx.plugin(gitHost, config)`
+   loader row. We mount it *inside* `dsh-panes` (`ctx.plugin(gitHost, config)`
    in `src/index.ts`), so it cannot own a row: the schema lives in
    `src/config.ts`, generated from `RAIL_CONFIG_IDS` (exported here).
 2. **`apply(ctx, config)`** stores the row config (`configure()`) so the route can
@@ -49,9 +49,9 @@ since 2026-11-03 the tree is ours, so new changes are recorded here only.
    dead code (the smallest safe diff); the prewarm, `modelDirectories`,
    `configForms` and settings-card wiring stay.
 3. **Namespaces:** `RAIL_NS` `ide-git` → `workbench` (our row id),
-   `SETTINGS_BUNDLE` `dsh-ide-git` → `dsh-workbench` (our package name, the key
-   the Plugins page uses), `LOCALE_NS` → `dsh-workbench.git` (the workbench panel
-   owns `dsh-workbench`). `API_BASE` stays `dsh-ide-git/api` — the route prefix is
+   `SETTINGS_BUNDLE` `dsh-ide-git` → `dsh-panes` (our package name, the key
+   the Plugins page uses), `LOCALE_NS` → `dsh-panes.git` (the workbench panel
+   owns `dsh-panes`). `API_BASE` stays `dsh-ide-git/api` — the route prefix is
    upstream's.
 4. **Placement settings deleted:** the `conversationTab` / `immersive` /
    `composerStatus` switches configured seats that no longer exist, and their

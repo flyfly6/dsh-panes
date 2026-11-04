@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 import { createServer, request } from 'node:http'
 import { createHandler } from '../lib/index.js'
 
-const PLUGIN = 'dsh-workbench'
+const PLUGIN = 'dsh-panes'
 let server
 let port
 
@@ -26,7 +26,7 @@ function send({ method = 'POST', body, raw, headers = {} } = {}) {
       {
         host: '127.0.0.1',
         port,
-        path: '/dsh-workbench/api',
+        path: '/dsh-panes/api',
         method,
         headers: {
           'content-type': 'application/json',

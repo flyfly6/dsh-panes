@@ -1,9 +1,9 @@
 /**
- * dsh-workbench — host half.
+ * dsh-panes — host half.
  *
  * One HTTP surface backs the browser panel:
  *
- *   POST /dsh-workbench/api   { op, args } -> { ok: true, ... } | { ok: false, code, message }
+ *   POST /dsh-panes/api   { op, args } -> { ok: true, ... } | { ok: false, code, message }
  *
  * Trust fence: the route rides DSH's own web server, so it is same-origin by
  * construction. A request is served only from a loopback authority, or when the
@@ -19,15 +19,15 @@ import * as gitHost from './git/host.js'
 import { createNotesOps } from './notes'
 import { search } from './search'
 
-export const name = 'dsh-workbench'
+export const name = 'dsh-panes'
 export const inject = ['webServer']
 
 /* The row config schema (own fields + the forked Git settings). */
 export { Config } from './config'
 
-const ROUTE_PREFIX = '/dsh-workbench/api'
+const ROUTE_PREFIX = '/dsh-panes/api'
 const PLUGIN_HEADER = 'x-dsh-plugin'
-const PLUGIN_ID = 'dsh-workbench'
+const PLUGIN_ID = 'dsh-panes'
 const BODY_LIMIT = 1 << 20
 
 type PluginConfig = Record<string, unknown>
@@ -184,7 +184,7 @@ export function createHandler(readConfig: () => PluginConfig) {
 export function apply(ctx: any, config: PluginConfig = {}): void {
   ctx.effect(
     () => ctx.webServer.register({ kind: 'prefix', path: ROUTE_PREFIX, handler: createHandler(() => plainConfig(config)) }),
-    'dsh-workbench: api route',
+    'dsh-panes: api route',
   )
   // T2: the forked Git half keeps upstream's route, guards and method table; it
   // is mounted as a child fiber so disabling this plugin tears both down.
@@ -197,5 +197,5 @@ export function apply(ctx: any, config: PluginConfig = {}): void {
         /* already gone */
       }
     }
-  }, 'dsh-workbench: git routes')
+  }, 'dsh-panes: git routes')
 }

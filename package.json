@@ -1,7 +1,7 @@
 {
-  "name": "dsh-workbench",
+  "name": "dsh-panes",
   "version": "0.1.0",
-  "description": "Tabbed workspace workbench for DeepSeek Harness: one full-screen panel with project sidebar and per-project tabs",
+  "description": "Tabbed workspace panel for DeepSeek Harness: a project sidebar with per-project tabs for session, files, search, terminal, browser, source control and notes",
   "type": "module",
   "main": "./lib/index.js",
   "exports": {
@@ -11,15 +11,43 @@
   },
   "files": [
     "lib",
+    "!lib/client.bundle.js",
     "cordis.patch.yml",
     "README.md",
     "NOTICE.md",
+    "LICENSE",
+    "screenshots.json",
+    "assets",
     "src/git/LICENSE"
   ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "plugin",
+    "workbench",
+    "tabs",
+    "workspace",
+    "ide"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flyfly6/dsh-workspace.git"
+  },
+  "homepage": "https://github.com/flyfly6/dsh-workspace#readme",
+  "bugs": {
+    "url": "https://github.com/flyfly6/dsh-workspace/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build:styles": "node scripts/build-styles.mjs",
     "build:client": "tsdown && node scripts/wrap-client.mjs",
     "build": "pnpm run build:styles && pnpm run build:client",
+    "prepublishOnly": "pnpm run build",
     "typecheck": "tsc --noEmit",
     "test": "node --test test/*.test.mjs",
     "check": "pnpm run build && pnpm run typecheck && pnpm run test"

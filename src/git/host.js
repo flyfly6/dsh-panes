@@ -1,5 +1,5 @@
 /**
- * dsh-ide-git — host half, vendored into dsh-workbench from v0.21.1 (MIT).
+ * dsh-ide-git — host half, vendored into dsh-panes from v0.21.1 (MIT).
  *
  * [workbench-fork] mounted by src/index.ts as `ctx.plugin(gitHost, config)`:
  * the route prefix, the method table and every guard are upstream's. Our

@@ -17,7 +17,7 @@ try {
   Schema = (await import('@deepseek-ai/schemastery')).default
 } catch (error) {
   console.warn(
-    '[dsh-workbench] @deepseek-ai/schemastery is not resolvable here; the row config surface is absent: '
+    '[dsh-panes] @deepseek-ai/schemastery is not resolvable here; the row config surface is absent: '
       + (error instanceof Error ? error.message : String(error)),
   )
 }

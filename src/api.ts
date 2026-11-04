@@ -1,7 +1,7 @@
 /** Calls into the plugin's host route (one same-origin POST surface, `{op,args}`). */
 
-const PLUGIN_ID = 'dsh-workbench'
-const API = '/dsh-workbench/api'
+const PLUGIN_ID = 'dsh-panes'
+const API = '/dsh-panes/api'
 
 /** A host refusal, with the op's own code kept (callers branch on it). */
 export class ApiCallError extends Error {

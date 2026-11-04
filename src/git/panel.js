@@ -67,11 +67,11 @@ export default function createGitPanel(require) {
     /* The bundle's package name: the key the Plugins page uses for a bundle's own
        page and its `plugins.bundle.config` slot. */
     /* [workbench-fork] keyed by the package name on the Plugins page. */
-    const SETTINGS_BUNDLE = 'dsh-workbench'
+    const SETTINGS_BUNDLE = 'dsh-panes'
     /* The namespace this plugin's dictionaries are published under in the DSH
        locale registry. */
-    /* [workbench-fork] own namespace: the workbench panel owns 'dsh-workbench'. */
-    const LOCALE_NS = 'dsh-workbench.git'
+    /* [workbench-fork] own namespace: the panes panel owns 'dsh-panes'. */
+    const LOCALE_NS = 'dsh-panes.git'
     const LANE_WIDTH = 14
     /* Hard cap on the drawn lane columns. Lanes beyond the cap collapse into
        the last column: without the cap a branchy repository pushed the graph
