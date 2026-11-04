@@ -100,3 +100,18 @@ T5 / T4 / T1 / T3 全部在真机面板上走了一遍（Chrome DevTools MCP，�
   2. `+` 菜单历史会话标签显示 `会话 · session-`（`slice(0, 8)` 全落在 `session-` 前缀上）→ 先剥前缀再截断。
   3. 侧聊 dock 写死 `w-[380px]`，在已拆分的半栏里把主会话挤成窄条（占位文字换行成三行）→ 改为 `w-2/5 min-w-[220px] max-w-[380px]`。
 - **缺口（不阻塞发布，已记录）**：分叉侧聊需要目标会话至少有一轮完整对话，spike profile 没有 API key 造不出完成轮次，因此 fork 只验证到「宿主拒绝 + 界面给出可见提示」；上一轮失败提示已从静默吞掉改成 dock 内一行说明（并且 `client.tsx` 的 catch 会 `console.warn` 真实原因）。
+
+## 收尾（2026-11-05）
+
+六个子任务全部有结论并归档：
+
+| 子任务 | 结论 |
+|---|---|
+| T5 tab-actions | 交付（重命名 / 右键菜单 / 批量关闭 / 拖拽指示 / `⌥⌘←→` / F2 / ⇧F10） |
+| T4 session-restore | 交付（宿主 `layout.json` + 400ms debounce + 离页 flush + 重置布局） |
+| T1 monaco-editor | 以「文本框 + 原子写 + 冲突检测」交付；Monaco 与 LSP 合并搁置 |
+| T2 monaco-lsp | 搁置：宿主没有 vendor 静态路由与 worker 前提，真要做时与 T1 合并重新设计 |
+| T3 side-conversation | 以 fork + 右栏 dock 交付；composer 注入不存在，引用回流未做 |
+| T6 git-tab-native | 不重构：现有 fork 已随宿主主题与字号走 |
+
+未做的切片（写进各任务 PRD 与 README「Known limits」）：搜索自动重跑、终端「已结束·重开」卡片、会话 tab 校验、explorer 展开态持久化、多窗口冲突提示、侧聊列表改存宿主、代码编辑器高亮与补全。发布动作（重截截图、`npm publish`、市场上架）需要凭证，留待用户执行。
