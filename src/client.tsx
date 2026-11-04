@@ -108,13 +108,33 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
    * picker. This client half exposes no `add`-shaped API today (probed: only
    * `model`/`name`/`ctx`), so the panel reports the refusal instead of a no-op.
    */
-  const addProject = async (path: string): Promise<void> => {
+  const addProject = async (path: string): Promise<string | undefined> => {
     const service = ctx.workspaces ?? ctx.workspace
+    /* v0.3: the client face does have `create({ path })` (the v0.2 note that it
+       did not was wrong). Older hosts get the add/register fallback. */
+    const create = (service as { create?: (input: { path: string }) => Promise<{ workspaceId?: string }> } | undefined)?.create
+    if (typeof create === 'function') {
+      const created = await create.call(service, { path })
+      return typeof created?.workspaceId === 'string' ? created.workspaceId : undefined
+    }
     const add =
       (service as { add?: (path: string) => unknown } | undefined)?.add ??
       (service as { register?: (path: string) => unknown } | undefined)?.register
     if (typeof add !== 'function') throw new Error(t('sidebar.addProjectUnavailable'))
     await add.call(service, path)
+    return undefined
+  }
+
+  /** Native directory picker (host owns it; null when the user cancels). */
+  const pickDirectory = async (): Promise<string | null> => {
+    try {
+      const service = (ctx.get?.('uiWorkspace') ?? ctx.uiWorkspace) as { pickDirectory?: () => Promise<string | null> } | undefined
+      if (typeof service?.pickDirectory !== 'function') return null
+      const picked = await service.pickDirectory()
+      return typeof picked === 'string' && picked !== '' ? picked : null
+    } catch {
+      return null
+    }
   }
   /**
    * New session tab: the host owns "New Session" (`uiWorkspace.connectWorkspace`
@@ -248,8 +268,11 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
         .filter((entry: any) => typeof entry?.options?.key === 'string' && entry.options.key !== PANEL_KEY)
         .map((entry: any) => {
           const key = String(entry.options.key)
+          /* The host's own label wins: the sidebar must say what the default
+             UI says. Locale knowledge is only the fallback. */
+          const own = typeof entry.options.label === 'string' ? entry.options.label.trim() : ''
           const known = `apps.${key}` in zh || `apps.${key}` in en
-          return { key, label: known ? t(`apps.${key}`) : key.charAt(0).toUpperCase() + key.slice(1) }
+          return { key, label: own !== '' ? own : known ? t(`apps.${key}`) : key.charAt(0).toUpperCase() + key.slice(1) }
         })
     } catch {
       return []
@@ -277,6 +300,7 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
               /* Read per render: the settings card writes the same volatile refs. */
               appearance: () => appearanceOf(config),
               addProject,
+              pickDirectory,
               toggleTheme,
               newSession,
               collapseHostSidebar,

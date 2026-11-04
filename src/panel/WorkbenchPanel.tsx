@@ -505,8 +505,9 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
 
   const createTab = (kind: TabKind | 'openFile' | 'newProject') => {
     if (kind === 'openFile') {
-      const path = window.prompt(t('menu.openFile'))
-      if (path !== null && path.trim() !== '') openFile(path.trim())
+      /* The quick-open palette is the real picker; a typed absolute path was a
+         dead end (no completion, no error, and it looked broken). */
+      setQuickOpen(true)
       return
     }
     if (kind === 'newProject') {
@@ -541,11 +542,17 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
 
   const addProjectFromPrompt = async () => {
     setSidebarNote('')
-    const path = window.prompt(t('sidebar.addProjectPrompt'))
-    if (path === null || path.trim() === '') return
+    /* Native picker first; a host without one falls back to typing a path. */
+    let path: string | null = props.pickDirectory === undefined ? null : await props.pickDirectory()
+    if (path === null) {
+      const typed = window.prompt(t('sidebar.addProjectPrompt'))
+      path = typed === null || typed.trim() === '' ? null : typed.trim()
+    }
+    if (path === null) return
     try {
       if (addProject === undefined) throw new Error(t('sidebar.addProjectUnavailable'))
-      await addProject(path.trim())
+      const created = await addProject(path)
+      if (created !== undefined) setLayout((prev) => setActiveProject(prev, created))
     } catch (error) {
       setSidebarNote((error as Error).message)
     }

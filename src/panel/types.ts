@@ -68,7 +68,9 @@ export interface PanelProps {
   /** `$HOME`, so the sidebar can show `~/projects/app` like the design. */
   home?: string
   /** Register another workspace (the `Add project` row and `+` menu). */
-  addProject?: (path: string) => Promise<void>
+  addProject?: (path: string) => Promise<string | undefined>
+  /** Native directory picker; `null` when the host has none or the user cancels. */
+  pickDirectory?: () => Promise<string | null>
   /** Collapse / restore dsh's own sidebar around the panel (R1.1). */
   collapseHostSidebar?: () => void
   restoreHostSidebar?: () => void
