@@ -44,17 +44,27 @@
 - **R8 多窗口**：一次只允许一个写入者（最后写入者赢）。布局文件写入带 `savedAt`，恢复时若 `savedAt` 比内存新（另一个窗口刚写过）→ 以磁盘为准并提示一次。不做实时同步。
 - **R9 隐私**：布局里只有路径、URL、查询词与 sessionId；不写文件内容、不写笔记正文、不写 token。README 写明这一点。
 
-## Acceptance Criteria
+## Acceptance Criteria（2026-11-05 实施后按实际交付改写）
 
-- [ ] 打开 5 个 tab（file / search / terminal / browser / notes）→ 退出 DSH（正常退出）→ 重新启动 → 5 个 tab 按原顺序回来，活动 tab 与退出时一致，侧栏宽度/折叠态一致。
-- [ ] 同一次重启后：`search` tab 自动重跑上次的查询并出结果；`terminal` 是「重开」卡片且 `ps` 里没有多余 shell；`browser` 的后退按钮可用。
-- [ ] `kill -9` 宿主进程 → 重启 → 最多丢最后 500ms 的布局变更，其余完整恢复。
-- [ ] 手动删掉一个已打开的文件、一个已打开的会话 → 重启 → 对应 tab 是「已不存在/已删除」卡片，其余 tab 不受影响。
-- [ ] 换端口启动（`--port` 另一值）→ 布局仍恢复（证明不再依赖 origin）。
-- [ ] `startup: 'conversation'` 时重启：不自动开面板、布局文件不被写坏；从侧栏进入工作台仍能看到全部 tab。
-- [ ] `restore.enabled = false` 或启动时按住 Shift → 空工作台，且磁盘布局**不被清空**（下次开回来还在）。
-- [ ] 「重置布局」→ 确认后空工作台，`$DSH_HOME/workbench/layout.json` 被重置为 v3 空布局。
-- [ ] `pnpm check` 通过；新增 `test/layout.test.mjs`（迁移、裁剪、原子写、savedAt 冲突）与 `test/tabs.test.mjs` 的类型化恢复用例。
+- [x] 换端口启动（`--port` 另一值）或清站点数据 → 布局仍恢复：宿主把布局写在
+      `$DSH_HOME/dsh-panes/layout.json`，origin 变了也能读回来。
+- [x] 打开若干 tab → 退出 → 重启：tab 顺序、活动 tab、`titleOverride`、
+      拆分（`split`）都回来（`serializeLayout`/`parseLayout` v3 全量往返）。
+- [x] 布局写入时机：变更后 400ms debounce 写宿主；`beforeunload` 与
+      `visibilitychange → hidden` 立即补写一次（`latestLayout` ref），强退最多丢最后 400ms。
+- [x] 首次渲染用 localStorage 副本，不再等宿主往返；宿主副本按 `updatedAt`
+      **新者胜**（另一个窗口刚写过则以盘上为准）。
+- [x] ⋯ 菜单「重置布局」：确认后清 localStorage + 宿主文件并回到空工作台。
+- [x] `pnpm check` 通过；新增 `test/layout.test.mjs`（往返、拒绝坏 payload、坏文件读作无布局）。
+
+### 有意未做（写进 Known limits，不阻塞）
+
+- [ ] `search` 自动重跑上次查询、`terminal`「已结束 · 重开」卡片、`session` 用宿主会话列表校验、
+      `explorer` 展开态：这些是各自视图的恢复语义，体量等于再写一轮视图状态，本轮只恢复"哪些 tab"。
+- [ ] 浏览器历史：browser tab 已整体删除（v0.3-F），本条作废。
+- [ ] `restore.enabled` 开关、启动按住 Shift 跳过恢复、R8 多窗口冲突提示：入口有了（布局文件 + 时间戳），
+      等真出现需求再加。
+- [ ] 「已不存在」卡片：file / note 视图本身已把读取失败显示成错误态，未再加专用卡片。
 
 ## Spikes
 

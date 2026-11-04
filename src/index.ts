@@ -16,6 +16,7 @@ import { spawn } from 'node:child_process'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import * as gitHost from './git/host.js'
+import { createLayoutOps } from './layoutStore'
 import { createNotesOps } from './notes'
 import { search } from './search'
 
@@ -117,6 +118,7 @@ export function createOps(readConfig: () => PluginConfig) {
     // Notes (T3): the vault lives outside every workspace, so the same note is
     // reachable from all of them.
     ...notes,
+    ...createLayoutOps(),
     ping: () => ({ plugin: PLUGIN_ID, alive: true }),
     search: (args: Json, signal?: AbortSignal) => search({ ...(args as any), signal }),
     'path.reveal': async (args: Json) => {

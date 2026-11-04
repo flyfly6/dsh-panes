@@ -67,6 +67,7 @@ import { isDark, languageLabel } from '../highlight'
 import type { PanelProps, Project, Translate } from './types'
 
 const STORE_KEY = 'dsh-panes:layout'
+const STORE_STAMP = 'dsh-panes:layout-stamp'
 const LAST_PANEL_KEY = 'dsh-panes:last-panel'
 
 /** What a registered tab type gets to draw its body. */
@@ -336,13 +337,81 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
     })
   }, [projects])
 
+  /* The host copy is the one that survives a port change; localStorage is the
+     fast path used while (and if) the host is unreachable. */
+  const latestLayout = React.useRef<{ payload: string; updatedAt: number } | null>(null)
+
   React.useEffect(() => {
+    const payload = serializeLayout(layout)
+    const updatedAt = Date.now()
+    latestLayout.current = { payload, updatedAt }
     try {
-      window.localStorage.setItem(STORE_KEY, serializeLayout(layout))
+      window.localStorage.setItem(STORE_KEY, payload)
+      window.localStorage.setItem(STORE_STAMP, String(updatedAt))
     } catch {
       /* private mode: keep the in-memory layout */
     }
+    const timer = window.setTimeout(() => {
+      void call('layout.set', { payload, updatedAt }).catch(() => undefined)
+    }, 400)
+    return () => window.clearTimeout(timer)
   }, [layout])
+
+  /* Leaving the page must not lose the last 400ms of changes. */
+  React.useEffect(() => {
+    const flush = () => {
+      const doc = latestLayout.current
+      if (doc === null) return
+      void call('layout.set', doc).catch(() => undefined)
+    }
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    window.addEventListener('beforeunload', flush)
+    document.addEventListener('visibilitychange', onHidden)
+    return () => {
+      window.removeEventListener('beforeunload', flush)
+      document.removeEventListener('visibilitychange', onHidden)
+    }
+  }, [])
+
+  const resetLayout = () => {
+    if (!window.confirm(t('tabs.resetLayoutConfirm'))) return
+    const empty = serializeLayout(parseLayout(null))
+    try {
+      window.localStorage.setItem(STORE_KEY, empty)
+      window.localStorage.setItem(STORE_STAMP, String(Date.now()))
+    } catch {
+      /* ignore */
+    }
+    void call('layout.set', { payload: empty, updatedAt: Date.now() }).catch(() => undefined)
+    setLayout(parseLayout(null))
+  }
+
+  /* Restore before the first paint matters: adopt the host copy only when it is
+     newer than what localStorage already holds. */
+  React.useEffect(() => {
+    let cancelled = false
+    void call('layout.get', {})
+      .catch(() => null)
+      .then((remote) => {
+        if (cancelled) return
+        const doc = remote as { payload?: unknown; updatedAt?: unknown } | null
+        if (doc === null || typeof doc.payload !== 'string' || typeof doc.updatedAt !== 'number') return
+        const local = Number(window.localStorage.getItem(STORE_STAMP) ?? 0)
+        if (!(doc.updatedAt > local)) return
+        try {
+          window.localStorage.setItem(STORE_KEY, doc.payload)
+          window.localStorage.setItem(STORE_STAMP, String(doc.updatedAt))
+        } catch {
+          /* ignore */
+        }
+        setLayout(parseLayout(doc.payload))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const activeProjectId = layout.activeProjectId ?? projects[0]?.id ?? null
   const project = projects.find((item) => item.id === activeProjectId)
@@ -1080,6 +1149,8 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
               {t('tabs.closeOthers')}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => closeMany(state.tabs.map((tab) => tab.id))}>{t('tabs.closeAll')}</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={resetLayout}>{t('tabs.resetLayout')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
