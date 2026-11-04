@@ -1,8 +1,10 @@
 # dsh-panes
 
+<img src="assets/icon.png" width="96" alt="dsh-panes icon" align="right">
+
 A full-screen workspace panel for [DeepSeek Harness](https://github.com/deepseek-ai): a
 project sidebar on the left and, per project, a set of tabs — session, files,
-search, terminal, browser, source control and notes.
+search, terminal, source control and notes.
 
 ![dsh-panes workspace: project sidebar, per-project tabs, Markdown preview](assets/01-workspace.png)
 
@@ -11,7 +13,7 @@ search, terminal, browser, source control and notes.
 | | |
 |---|---|
 | Panel | `main` + `sidebar.panellist` row — one panel, opened from the DSH sidebar |
-| Tabs | `session` · `file` · `explorer` · `search` · `terminal` · `browser` · `git` · `notes` |
+| Tabs | `session` · `file` · `explorer` · `search` · `terminal` · `git` · `notes` |
 | Host | one same-origin `POST /dsh-panes/api` route, plugin-header fenced |
 | Client | one bundled file (shadcn/ui + Tailwind, preflight off), React external |
 | License | MIT |
@@ -25,12 +27,30 @@ search, terminal, browser, source control and notes.
 | **Explorer** | Directory tree: open, copy path, reveal in the system file manager. |
 | **Search** | Project-wide content search: regex, case sensitivity, globs, split result list + preview, hit counts, truncation flag. Uses the machine's `rg`, then the `rg` bundled with `@vscode/ripgrep`, then a bounded JS walk — and tells you which engine ran. |
 | **Terminal** | A real pty in the tab, via the host's `webTerminals` service, with fit-on-resize and live theme. |
-| **Browser** | Embed an `http(s)` page next to the code, with back/forward/reload. |
 | **Source control** | The Git tool window: changes, staged/unstaged, commit box, commit history graph, diffs, branch actions (16 rail buttons, each switchable), AI-generated commit messages. |
 | **Notes** | A Notion-style Markdown vault: list + [BlockNote](https://www.blocknotejs.org/) editor, one `.md` per note, frontmatter preserved by the host, `.trash` on delete, etag-based conflict detection. |
 
 ![Session tab](assets/02-session.png)
 ![Code file tab](assets/03-code-file.png)
+
+## What's new in 0.2.0
+
+- **One type ladder** — every text step derives from `--wb-font-ui-size`, so the
+  `fontUiSize` config field scales the whole panel (default is one step larger).
+  The status bar's light/dark label is now a real toggle.
+- **Notes per project** — each project gets its own folder in the vault, the list
+  and search are scoped to it, names come from the frontmatter everywhere
+  (list, tab, breadcrumb), and notes can move between projects or reveal in Finder.
+- **Session tabs behave** — "new session" asks the host for a blank session
+  instead of reopening the first one, a history list sits in the `+` menu, the
+  tab title follows the session's own title, and the scroll position survives a
+  tab switch.
+- **Split view** — tabs can be split left/right or top/bottom, moved across panes,
+  and the split collapses when its pane empties.
+- **Explorer became a split view too**: tree on the left, files in inner tabs on
+  the right, with sorting and jump-to-top/bottom buttons.
+- **Browser tab removed** — Electron `<webview>` is gated by the host, so the
+  iframe could not open most sites; use the system browser.
 
 ## Install
 
@@ -63,7 +83,7 @@ Uninstall: remove it from `dsh.profile.bundles`, then
   list; the collapse button shrinks the sidebar to a 52px rail (automatic below
   820px of panel width).
 - `+` at the top right opens the **NEW TAB** menu: session, open file, explorer,
-  search, terminal, browser, git, notes.
+  search, terminal, git, notes.
 - Tabs are scoped to the project: switching project switches the whole tab set.
   Each project's layout is persisted.
 - The status bar shows branch + changed-file count (`±n`, click opens Git), live
@@ -111,7 +131,7 @@ The package is a Cordis plugin with two halves, mounted by a bundle patch:
 |---|---|
 | `src/index.ts` | Host half: the Cordis plugin, `POST /dsh-panes/api` route, `Config` schema. |
 | `src/client.tsx` | Browser half: registers the `main` panel and its `sidebar.panellist` row. |
-| `src/panel/` | Panel shell, file/explorer/search/Markdown/terminal/browser views, shared types. |
+| `src/panel/` | Panel shell, file/explorer/search/Markdown/terminal views, shared types. |
 | `src/tabs.ts` | Pure tab model: per-project tab sets, idempotent open, persisted layout. |
 | `src/notes.ts`, `src/notes/` | Notes vault (host ops) and the list + BlockNote editor. |
 | `src/git/` | Forked Git tool window (`host.js`, `panel.js`, adapter); see `src/git/UPSTREAM.md` for provenance. |
@@ -164,7 +184,8 @@ profile needs a client restart.
   longer synced with upstream; it still carries its own `dig-` styling.
 - The Git status bar calls `summary` with `stats: false` — it shows `±n` changed
   files, not added/removed line counts.
-- The browser tab can only frame sites that allow embedding.
+- There is no in-app browser tab: Electron `<webview>` is gated by the host, and an
+  `iframe` cannot open most sites. Use the system browser.
 - Notes: a symlink inside the vault is refused (`lstat`), so a note can never be
   a link to a file outside the vault — read *or* write.
 - The browser bundle is a single ~9.4 MB file (≈2.1 MB gzip), most of it
