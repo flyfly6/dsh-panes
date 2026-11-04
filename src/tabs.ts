@@ -16,6 +16,15 @@ export type TabKind = string
 /** The kinds the shell itself knows how to build from the `+` menu. */
 export const BUILTIN_KINDS = ['session', 'file', 'explorer', 'search', 'terminal', 'git', 'note', 'notes'] as const
 
+/** Which of the two panes a tab lives in (v0.3 split view). */
+export type Pane = 'primary' | 'secondary'
+
+/** One project's split: the secondary pane's orientation and its active tab. */
+export interface Split {
+  orientation: 'row' | 'col'
+  activeTabId: string | null
+}
+
 export interface TabModel {
   /** `${projectId}:${kind}:${contentId}` — dedupe key, also the React key. */
   id: string
@@ -23,6 +32,8 @@ export interface TabModel {
   contentId: string
   title: string
   params?: Record<string, unknown>
+  /** Absent means `primary` (the pane every pre-v0.3 layout had). */
+  pane?: Pane
 }
 
 export interface ProjectTabs {
@@ -31,6 +42,8 @@ export interface ProjectTabs {
   /** Most recent first, capped at CLOSED_LIMIT. */
   closed: TabModel[]
   sidebar: { width: number; collapsed: boolean }
+  /** `null` = one pane. Set by splitting; cleared when the pane empties. */
+  split: Split | null
 }
 
 export interface Layout {
@@ -39,7 +52,7 @@ export interface Layout {
   projects: Record<string, ProjectTabs>
 }
 
-export const SCHEMA_VERSION = 2 as const
+export const SCHEMA_VERSION = 3 as const
 export const CLOSED_LIMIT = 10
 export const SIDEBAR_WIDTH = { min: 200, max: 320, default: 248, collapsed: 52 } as const
 
@@ -49,6 +62,7 @@ export function emptyProject(): ProjectTabs {
     activeTabId: null,
     closed: [],
     sidebar: { width: SIDEBAR_WIDTH.default, collapsed: false },
+    split: null,
   }
 }
 
@@ -124,7 +138,11 @@ export function openTab(layout: Layout, projectId: string, input: OpenTabInput):
 
 export function activateTab(layout: Layout, projectId: string, id: string): Layout {
   const current = projectState(layout, projectId)
-  if (!current.tabs.some((tab) => tab.id === id)) return layout
+  const tab = current.tabs.find((candidate) => candidate.id === id)
+  if (tab === undefined) return layout
+  if (tab.pane === 'secondary' && current.split !== null) {
+    return withProject(layout, projectId, { ...current, split: { ...current.split, activeTabId: id } })
+  }
   return withProject(layout, projectId, { ...current, activeTabId: id })
 }
 
@@ -134,15 +152,80 @@ export function closeTab(layout: Layout, projectId: string, id: string): Layout 
   if (index < 0) return layout
   const closedTab = current.tabs[index]!
   const tabs = current.tabs.filter((tab) => tab.id !== id)
-  const activeTabId =
-    current.activeTabId === id
-      ? (tabs[Math.min(index, tabs.length - 1)]?.id ?? null)
-      : current.activeTabId
+  const secondary = tabs.filter((tab) => tab.pane === 'secondary')
+  /* A split with nothing left in its pane is not a split anymore. */
+  const split =
+    current.split === null || secondary.length === 0
+      ? null
+      : current.split.activeTabId === id
+        ? { ...current.split, activeTabId: secondary[Math.min(index, secondary.length - 1)]!.id }
+        : current.split
+  const primary = tabs.filter((tab) => (tab.pane ?? 'primary') === 'primary')
+  const activeTabId = primary.some((tab) => tab.id === current.activeTabId)
+    ? current.activeTabId
+    : (primary[primary.length - 1]?.id ?? null)
   return withProject(layout, projectId, {
     ...current,
     tabs,
     activeTabId,
+    split,
     closed: [closedTab, ...current.closed].slice(0, CLOSED_LIMIT),
+  })
+}
+
+/** Split the active tab into a second pane (no-op when already split). */
+export function splitActive(layout: Layout, projectId: string, orientation: Split['orientation'] = 'row'): Layout {
+  const current = projectState(layout, projectId)
+  const id = current.activeTabId
+  if (id === null || current.split !== null) return layout
+  const tabs = current.tabs.map((tab) => (tab.id === id ? { ...tab, pane: 'secondary' as Pane } : tab))
+  const primary = tabs.filter((tab) => (tab.pane ?? 'primary') === 'primary')
+  return withProject(layout, projectId, {
+    ...current,
+    tabs,
+    activeTabId: primary[primary.length - 1]?.id ?? null,
+    split: { orientation, activeTabId: id },
+  })
+}
+
+/** Pull every secondary tab back into one pane and drop the split. */
+export function unsplit(layout: Layout, projectId: string): Layout {
+  const current = projectState(layout, projectId)
+  if (current.split === null) return layout
+  const tabs = current.tabs.map(({ pane: _pane, ...tab }) => tab)
+  return withProject(layout, projectId, {
+    ...current,
+    tabs,
+    activeTabId: current.split.activeTabId ?? current.activeTabId,
+    split: null,
+  })
+}
+
+/** Move one tab across panes; an emptied secondary pane closes the split. */
+export function togglePane(layout: Layout, projectId: string, id: string): Layout {
+  const current = projectState(layout, projectId)
+  const tab = current.tabs.find((candidate) => candidate.id === id)
+  if (tab === undefined) return layout
+  const toSecondary = (tab.pane ?? 'primary') === 'primary'
+  if (toSecondary && current.split === null) return splitActive(layout, projectId)
+  const tabs = current.tabs.map((candidate) =>
+    candidate.id === id ? { ...candidate, pane: toSecondary ? ('secondary' as Pane) : undefined } : candidate,
+  )
+  const secondary = tabs.filter((candidate) => candidate.pane === 'secondary')
+  if (secondary.length === 0) {
+    return withProject(layout, projectId, {
+      ...current,
+      tabs: tabs.map(({ pane: _pane, ...rest }) => rest),
+      activeTabId: id,
+      split: null,
+    })
+  }
+  const primary = tabs.filter((candidate) => (candidate.pane ?? 'primary') === 'primary')
+  return withProject(layout, projectId, {
+    ...current,
+    tabs,
+    activeTabId: toSecondary ? (primary[primary.length - 1]?.id ?? null) : id,
+    split: current.split === null ? { orientation: 'row', activeTabId: id } : { ...current.split, activeTabId: toSecondary ? (secondary[secondary.length - 1]?.id ?? id) : id },
   })
 }
 
@@ -199,7 +282,8 @@ export function parseLayout(raw: string | null): Layout {
   }
   if (typeof parsed !== 'object' || parsed === null) return emptyLayout()
   const candidate = parsed as Record<string, unknown>
-  if (candidate.schemaVersion !== SCHEMA_VERSION) return emptyLayout()
+  /* v2 layouts predate the split view; they restore into the primary pane. */
+  if (candidate.schemaVersion !== SCHEMA_VERSION && candidate.schemaVersion !== 2) return emptyLayout()
 
   const projects: Record<string, ProjectTabs> = {}
   const rawProjects = candidate.projects
@@ -215,6 +299,7 @@ export function parseLayout(raw: string | null): Layout {
         typeof entry.activeTabId === 'string' && tabs.some((tab) => tab.id === entry.activeTabId)
           ? entry.activeTabId
           : (tabs[0]?.id ?? null)
+      const split = parseSplit(entry.split, tabs)
       projects[projectId] = {
         tabs,
         activeTabId,
@@ -223,6 +308,7 @@ export function parseLayout(raw: string | null): Layout {
           width: Math.min(SIDEBAR_WIDTH.max, Math.max(SIDEBAR_WIDTH.min, width)),
           collapsed: sidebar.collapsed === true,
         },
+        split,
       }
     }
   }
@@ -231,6 +317,18 @@ export function parseLayout(raw: string | null): Layout {
       ? candidate.activeProjectId
       : null
   return { schemaVersion: SCHEMA_VERSION, activeProjectId, projects }
+}
+
+/** A split survives only when its pane still has a tab to show. */
+function parseSplit(raw: unknown, tabs: TabModel[]): Split | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const entry = raw as Record<string, unknown>
+  if (entry.orientation !== 'row' && entry.orientation !== 'col') return null
+  const secondary = tabs.filter((tab) => tab.pane === 'secondary')
+  if (secondary.length === 0) return null
+  const wanted = typeof entry.activeTabId === 'string' ? entry.activeTabId : undefined
+  const activeTabId = secondary.some((tab) => tab.id === wanted) ? wanted! : secondary[0]!.id
+  return { orientation: entry.orientation, activeTabId }
 }
 
 function parseTab(raw: unknown, projectId: string): TabModel[] {
@@ -253,6 +351,7 @@ function parseTab(raw: unknown, projectId: string): TabModel[] {
         typeof entry.params === 'object' && entry.params !== null
           ? (entry.params as Record<string, unknown>)
           : undefined,
+      pane: entry.pane === 'secondary' ? 'secondary' : undefined,
     },
   ]
 }

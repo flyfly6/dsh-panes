@@ -16,10 +16,14 @@ import {
   X,
 } from 'lucide-react'
 import {
+  activateTab,
   closeTab,
   ensureProject,
   moveTab,
   openTab,
+  splitActive,
+  togglePane,
+  unsplit,
   parseLayout,
   projectState,
   reopenLast,
@@ -341,7 +345,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
   const git = useGitSummary(project?.path)
   const state: ProjectTabs =
     activeProjectId === null
-      ? { tabs: [], activeTabId: null, closed: [], sidebar: { width: SIDEBAR_WIDTH.default, collapsed: false } }
+      ? { tabs: [], activeTabId: null, closed: [], sidebar: { width: SIDEBAR_WIDTH.default, collapsed: false }, split: null }
       : projectState(layout, activeProjectId)
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId)
 
@@ -718,7 +722,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
   const tabStrip = (
     <div className="flex h-tab shrink-0 items-stretch border-b border-border bg-[var(--tabstrip-bg)]" role="tablist">
       <div className="wb-scroll flex min-w-0 flex-1 items-stretch overflow-x-auto">
-        {state.tabs.map((tab, index) => {
+        {state.tabs.filter((tab) => tab.pane !== 'secondary').map((tab) => {
           const active = tab.id === state.activeTabId
           const icon = registry.get(tab.kind)?.icon
           return (
@@ -728,13 +732,13 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
               aria-selected={active}
               tabIndex={0}
               draggable
-              onDragStart={() => (dragIndex.current = index)}
+              onDragStart={() => (dragIndex.current = state.tabs.findIndex((candidate) => candidate.id === tab.id))}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
                 event.preventDefault()
                 if (dragIndex.current !== null && activeProjectId !== null) {
                   const from = dragIndex.current
-                  setLayout((prev) => moveTab(prev, activeProjectId, from, index))
+                  setLayout((prev) => moveTab(prev, activeProjectId, from, state.tabs.findIndex((candidate) => candidate.id === tab.id)))
                 }
                 dragIndex.current = null
               }}
@@ -831,6 +835,31 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
+              disabled={state.split !== null}
+              onSelect={() => activeProjectId !== null && setLayout((prev) => splitActive(prev, activeProjectId, 'row'))}
+            >
+              {t('tabs.splitRow')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={state.split !== null}
+              onSelect={() => activeProjectId !== null && setLayout((prev) => splitActive(prev, activeProjectId, 'col'))}
+            >
+              {t('tabs.splitCol')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={activeTab === undefined}
+              onSelect={() => activeProjectId !== null && activeTab !== undefined && setLayout((prev) => togglePane(prev, activeProjectId, activeTab.id))}
+            >
+              {t('tabs.movePane')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={state.split === null}
+              onSelect={() => activeProjectId !== null && setLayout((prev) => unsplit(prev, activeProjectId))}
+            >
+              {t('tabs.unsplit')}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
               onSelect={() =>
                 activeProjectId !== null &&
                 activeTab !== undefined &&
@@ -902,33 +931,34 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
     </div>
   )
 
-  let content: React.ReactNode
-  if (activeTab === undefined) {
-    content = (
+  /* One renderer for both panes (v0.3 split): the same branches, keyed on `tab`. */
+  const bodyFor = (tab: TabModel | undefined): React.ReactNode => {
+  if (tab === undefined) {
+    return (
       <div className="grid h-full place-content-center gap-2 px-6 text-center text-muted-foreground">
         <strong className="text-sm text-foreground">{t('empty.title')}</strong>
         <span className="text-xs">{t('empty.hint')}</span>
       </div>
     )
   } else if (remote === undefined) {
-    content = <div className="p-3 text-xs text-muted-foreground">{t('panel.noBridge')}</div>
-  } else if (activeTab.kind === 'file') {
-    const line = typeof activeTab.params?.line === 'number' ? (activeTab.params.line as number) : undefined
-    const stamp = typeof activeTab.params?.stamp === 'number' ? (activeTab.params.stamp as number) : undefined
-    const markdown = /\.mdx?$/i.test(activeTab.contentId)
-    content = markdown ? (
+    return <div className="p-3 text-xs text-muted-foreground">{t('panel.noBridge')}</div>
+  } else if (tab.kind === 'file') {
+    const line = typeof tab.params?.line === 'number' ? (tab.params.line as number) : undefined
+    const stamp = typeof tab.params?.stamp === 'number' ? (tab.params.stamp as number) : undefined
+    const markdown = /\.mdx?$/i.test(tab.contentId)
+    return markdown ? (
       <MarkdownView
-        path={activeTab.contentId}
+        path={tab.contentId}
         sessionId={project?.sessionIds[0]}
         remote={remote}
         t={t}
         line={line}
         stamp={stamp}
-        scrollKey={activeTab.id}
+        scrollKey={tab.id}
       />
     ) : (
       <FileView
-        path={activeTab.contentId}
+        path={tab.contentId}
         sessionId={project?.sessionIds[0]}
         remote={remote}
         t={t}
@@ -937,8 +967,8 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
         onCursor={setCursor}
       />
     )
-  } else if (activeTab.kind === 'explorer') {
-    content = (
+  } else if (tab.kind === 'explorer') {
+    return (
       <ExplorerView
         root={project?.path ?? ''}
         sessionId={project?.sessionIds[0]}
@@ -947,13 +977,13 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
         t={t}
       />
     )
-  } else if (activeTab.kind === 'terminal') {
+  } else if (tab.kind === 'terminal') {
     const sessionId = project?.sessionIds[0]
-    content =
+    return (
       sessionId !== undefined && props.terminal !== undefined ? (
         <TerminalTab
-          tabId={activeTab.id}
-          contentId={activeTab.contentId}
+          tabId={tab.id}
+          contentId={tab.contentId}
           sessionId={sessionId}
           openModel={props.terminal}
           t={t}
@@ -961,12 +991,13 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
       ) : (
         <div className="grid h-full place-content-center text-xs text-muted-foreground">{t('terminal.unavailable')}</div>
       )
-  } else if (activeTab.kind === 'session') {
-    content =
+    )
+  } else if (tab.kind === 'session') {
+    return (
       (props as any).SessionProvider !== undefined && (props as any).renderSlot !== undefined && props.retainSession !== undefined ? (
-        <Guarded fallback={<SessionCard sessionId={activeTab.contentId} onOpen={close} t={t} />}>
+        <Guarded fallback={<SessionCard sessionId={tab.contentId} onOpen={close} t={t} />}>
           <EmbeddedConversation
-            sessionId={activeTab.contentId}
+            sessionId={tab.contentId}
             SessionProvider={(props as any).SessionProvider}
             renderSlot={(props as any).renderSlot}
             retainSession={props.retainSession}
@@ -974,10 +1005,11 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
           />
         </Guarded>
       ) : (
-        <SessionCard sessionId={activeTab.contentId} onOpen={close} t={t} />
+        <SessionCard sessionId={tab.contentId} onOpen={close} t={t} />
       )
-  } else if (activeTab.kind === 'search') {
-    content = (
+    )
+  } else if (tab.kind === 'search') {
+    return (
       <SearchView
         root={project?.path ?? ''}
         sessionId={project?.sessionIds[0]}
@@ -987,18 +1019,18 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
         t={t}
       />
     )
-  } else if (registry.get(activeTab.kind)?.render !== undefined) {
-    content = (
+  } else if (registry.get(tab.kind)?.render !== undefined) {
+    return (
       <Guarded
         fallback={
           <div className="grid h-full place-content-center gap-1 text-center text-xs text-muted-foreground">
-            <strong className="text-sm text-foreground">{activeTab.title}</strong>
+            <strong className="text-sm text-foreground">{tab.title}</strong>
             <span>{t('common.crashed')}</span>
           </div>
         }
       >
-        {registry.get(activeTab.kind)!.render!({
-          tab: activeTab,
+        {registry.get(tab.kind)!.render!({
+          tab: tab,
           t,
           project,
           sessionId: project?.sessionIds[0],
@@ -1010,13 +1042,18 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
       </Guarded>
     )
   } else {
-    content = (
+    return (
       <div className="grid h-full place-content-center gap-2 text-center text-muted-foreground">
-        <strong className="text-sm text-foreground">{activeTab.title}</strong>
+        <strong className="text-sm text-foreground">{tab.title}</strong>
         <span className="text-xs">{t('common.notYet')}</span>
       </div>
     )
   }
+    return null
+  }
+
+  const content = bodyFor(activeTab)
+  const splitTab = state.split === null ? undefined : state.tabs.find((tab) => tab.id === state.split!.activeTabId)
 
   const isFileTab = activeTab?.kind === 'file'
   const statusBar = (
@@ -1068,6 +1105,57 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
     </div>
   )
 
+  /* Second pane's strip (v0.3): tabs only, no + menu, one unsplit control. */
+  const secondaryStrip = (
+    <div className="flex h-tab shrink-0 items-stretch border-b border-border bg-[var(--tabstrip-bg)]" role="tablist">
+      <div className="wb-scroll flex min-w-0 flex-1 items-stretch overflow-x-auto">
+        {state.tabs
+          .filter((tab) => tab.pane === 'secondary')
+          .map((tab) => {
+            const active = state.split?.activeTabId === tab.id
+            return (
+              <div
+                key={tab.id}
+                role="tab"
+                aria-selected={active}
+                tabIndex={0}
+                onClick={() => activeProjectId !== null && setLayout((prev) => activateTab(prev, activeProjectId, tab.id))}
+                onKeyDown={(event) => event.key === 'Enter' && activeProjectId !== null && setLayout((prev) => activateTab(prev, activeProjectId, tab.id))}
+                className={cn(
+                  'group flex min-w-[96px] max-w-[200px] cursor-pointer items-center gap-1.5 whitespace-nowrap border-r border-border px-2.5 text-xs',
+                  active ? 'bg-[var(--background)] text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <KindIcon kind={tab.kind} />
+                <span className="truncate">{tab.title}</span>
+                <button
+                  type="button"
+                  aria-label={t('tabs.close')}
+                  className="ml-auto grid h-3.5 w-3.5 shrink-0 place-items-center rounded hover:bg-accent"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    closeOne(tab.id)
+                  }}
+                >
+                  <X className="h-2.5 w-2.5" aria-hidden />
+                </button>
+              </div>
+            )
+          })}
+      </div>
+      <div className="flex shrink-0 items-center gap-0.5 px-1.5">
+        <Button
+          variant="ghost"
+          size="icon"
+          title={t('tabs.unsplit')}
+          onClick={() => activeProjectId !== null && setLayout((prev) => unsplit(prev, activeProjectId))}
+        >
+          <X className="h-3 w-3" aria-hidden />
+        </Button>
+      </div>
+    </div>
+  )
+
   return (
     <div ref={rootRef} className="workbench-root" style={rootStyle as React.CSSProperties}>
       {quickOpen && (
@@ -1080,9 +1168,30 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
       )}
       {sidebar}
       <div className="flex min-w-0 flex-1 flex-col">
-        {tabStrip}
-        {breadcrumb}
-        <div className="wb-scroll relative min-h-0 flex-1 overflow-auto bg-[var(--background)]">{content}</div>
+        {state.split === null ? (
+          <>
+            {tabStrip}
+            {breadcrumb}
+            <div className="wb-scroll relative min-h-0 flex-1 overflow-auto bg-[var(--background)]">{content}</div>
+          </>
+        ) : (
+          <div className={cn('flex min-h-0 flex-1', state.split.orientation === 'col' ? 'flex-col' : 'flex-row')}>
+            <div className="flex min-w-0 flex-1 flex-col">
+              {tabStrip}
+              {breadcrumb}
+              <div className="wb-scroll relative min-h-0 flex-1 overflow-auto bg-[var(--background)]">{content}</div>
+            </div>
+            <div
+              className={cn(
+                'flex min-w-0 flex-1 flex-col border-border',
+                state.split.orientation === 'col' ? 'border-t' : 'border-l',
+              )}
+            >
+              {secondaryStrip}
+              <div className="wb-scroll relative min-h-0 flex-1 overflow-auto bg-[var(--background)]">{bodyFor(splitTab)}</div>
+            </div>
+          </div>
+        )}
         {statusBar}
       </div>
     </div>

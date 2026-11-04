@@ -15,7 +15,10 @@ import {
   reopenLast,
   serializeLayout,
   setSidebar,
+  splitActive,
   tabId,
+  togglePane,
+  unsplit,
 } from '../src/tabs.ts'
 
 const A = 'project-a'
@@ -146,4 +149,57 @@ test('a reload keeps plugin-registered kinds, drops a stale schema and garbage',
   assert.equal(projectState(restored, A).activeTabId, tabId(A, 'file', 'keep.ts'))
   assert.deepEqual(parseLayout(JSON.stringify({ schemaVersion: 1, projects: {} })), emptyLayout())
   assert.deepEqual(parseLayout('not json'), emptyLayout())
+})
+
+test('splitting moves the active tab into a second pane, unsplitting brings it back', () => {
+  const A = 'proj-split'
+  let layout = openTab(ensureProject(emptyLayout(), A), A, { kind: 'file', contentId: 'a.ts', title: 'a.ts' })
+  layout = openTab(layout, A, { kind: 'file', contentId: 'b.ts', title: 'b.ts' })
+  layout = splitActive(layout, A, 'row')
+  const after = projectState(layout, A)
+  assert.equal(after.split?.orientation, 'row')
+  assert.deepEqual(after.tabs.filter((tab) => tab.pane === 'secondary').map((tab) => tab.contentId), ['b.ts'])
+  assert.equal(after.activeTabId, tabId(A, 'file', 'a.ts'))
+  assert.equal(after.split?.activeTabId, tabId(A, 'file', 'b.ts'))
+
+  /* Cross-pane move keeps the split alive while both panes have tabs, and the
+     split disappears once the second pane is empty again. */
+  layout = togglePane(layout, A, tabId(A, 'file', 'a.ts'))
+  assert.equal(projectState(layout, A).split !== null, true)
+  assert.equal(projectState(layout, A).tabs.filter((tab) => tab.pane === 'secondary').length, 2)
+  layout = closeTab(layout, A, tabId(A, 'file', 'a.ts'))
+  layout = closeTab(layout, A, tabId(A, 'file', 'b.ts'))
+  assert.equal(projectState(layout, A).split, null)
+  assert.deepEqual(projectState(layout, A).tabs, [])
+
+  /* Unsplit folds everything back into one pane. */
+  layout = openTab(layout, A, { kind: 'file', contentId: 'c.ts', title: 'c.ts' })
+  layout = openTab(layout, A, { kind: 'file', contentId: 'd.ts', title: 'd.ts' })
+  layout = splitActive(layout, A, 'col')
+  layout = unsplit(layout, A)
+  assert.equal(projectState(layout, A).split, null)
+  assert.equal(projectState(layout, A).tabs.every((tab) => tab.pane === undefined), true)
+  assert.equal(projectState(layout, A).activeTabId, tabId(A, 'file', 'd.ts'))
+})
+
+test('a split survives a reload, and a v2 layout loads without one', () => {
+  const A = 'proj-split-persist'
+  let layout = openTab(ensureProject(emptyLayout(), A), A, { kind: 'file', contentId: 'a.ts', title: 'a.ts' })
+  layout = openTab(layout, A, { kind: 'file', contentId: 'b.ts', title: 'b.ts' })
+  layout = splitActive(layout, A, 'col')
+  const restored = parseLayout(serializeLayout(layout))
+  assert.equal(projectState(restored, A).split?.orientation, 'col')
+  assert.equal(projectState(restored, A).split?.activeTabId, tabId(A, 'file', 'b.ts'))
+  assert.equal(projectState(restored, A).tabs.filter((tab) => tab.pane === 'secondary').length, 1)
+
+  /* v2 predates the split view: tabs load into the primary pane, no split. */
+  const v2 = parseLayout(
+    JSON.stringify({
+      schemaVersion: 2,
+      activeProjectId: A,
+      projects: { [A]: { tabs: [{ kind: 'file', contentId: 'x.ts', title: 'x.ts' }], sidebar: { width: 248, collapsed: false } } },
+    }),
+  )
+  assert.equal(projectState(v2, A).split, null)
+  assert.equal(projectState(v2, A).tabs[0]?.pane, undefined)
 })
