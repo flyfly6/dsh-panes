@@ -166,20 +166,98 @@ function TerminalTab({
 }
 
 /** Retains a Session reference for as long as the tab lives, then releases it. */
+/** Scroll offsets of session tabs, so switching back does not jump to the top. */
+const SESSION_SCROLL = new Map<string, number>()
+
+/** The transcript's own scroller — the host builds it, so it is found by shape. */
+function findScroller(host: HTMLElement): HTMLElement | null {
+  let best: HTMLElement | null = null
+  for (const node of host.querySelectorAll<HTMLElement>('div, section, main')) {
+    if (node.scrollHeight <= node.clientHeight + 4) continue
+    if (!/(auto|scroll)/.test(getComputedStyle(node).overflowY)) continue
+    if (best === null || node.scrollHeight > best.scrollHeight) best = node
+  }
+  return best
+}
+
 function EmbeddedConversation({
   sessionId,
   SessionProvider,
   renderSlot,
   retainSession,
+  retitle,
 }: {
   sessionId: string
   SessionProvider: React.ComponentType<any>
   renderSlot: (key: string, owner: unknown) => React.ReactNode
   retainSession: (sessionId: string) => { sessionId: string; release(): void }
+  retitle?: (title: string) => void
 }) {
   const reference = React.useMemo(() => retainSession(sessionId), [retainSession, sessionId])
+  const hostRef = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => () => reference.release(), [reference])
-  return <SessionProvider session={reference}>{renderSlot('workbench.conversation', {})}</SessionProvider>
+
+  /* The session log owns the title; read the last `session/title` event so the
+     tab and breadcrumb say the same thing the default UI says. */
+  React.useEffect(() => {
+    if (retitle === undefined) return undefined
+    const read = () => {
+      const window = (reference as any).binding?.eventSource?.getSnapshot?.()
+      const entries = Array.isArray(window?.entries) ? window.entries.slice(-200) : []
+      for (let index = entries.length - 1; index >= 0; index -= 1) {
+        const entry = entries[index]
+        if (entry?.type !== 'event' || entry.event?.type !== 'session/title') continue
+        const title = entry.event.data?.title
+        if (typeof title === 'string' && title.trim() !== '') retitle(title.trim())
+        return
+      }
+    }
+    read()
+    const source = (reference as any).binding?.eventSource
+    if (typeof source?.subscribe !== 'function') return undefined
+    return source.subscribe(read)
+  }, [reference, retitle])
+
+  /* ponytail: the scroll container belongs to the host's transcript, so it is
+     located by shape and polled while the conversation mounts. If the host ever
+     exposes the scroller, drop the search and keep the map. */
+  React.useEffect(() => {
+    const host = hostRef.current
+    if (host === null) return undefined
+    let element: HTMLElement | null = null
+    let timer: number | null = null
+    let attempts = 0
+    const attach = () => {
+      element = findScroller(host)
+      if (element === null) {
+        if (attempts < 30) {
+          attempts += 1
+          timer = window.setTimeout(attach, 100)
+        }
+        return
+      }
+      const saved = SESSION_SCROLL.get(sessionId) ?? 0
+      if (saved > 0) element.scrollTop = saved
+      element.addEventListener('scroll', remember, { passive: true })
+    }
+    const remember = () => {
+      if (element !== null) SESSION_SCROLL.set(sessionId, element.scrollTop)
+    }
+    attach()
+    return () => {
+      if (timer !== null) window.clearTimeout(timer)
+      if (element !== null) {
+        remember()
+        element.removeEventListener('scroll', remember)
+      }
+    }
+  }, [sessionId])
+
+  return (
+    <div ref={hostRef} className="h-full min-h-0">
+      <SessionProvider session={reference}>{renderSlot('workbench.conversation', {})}</SessionProvider>
+    </div>
+  )
 }
 
 function useDark(): boolean {
@@ -400,6 +478,27 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
     { kind: 'notes', label: t('tab.notes'), icon: <KindIcon kind="notes" /> },
   ]
 
+  /**
+   * New session tab (v0.3): ask the host to start/reuse a blank Session in this
+   * workspace, then show that exact id. It appears in the default page's session
+   * list too — one Session, two views (research/session-tabs.md).
+   */
+  const openNewSession = React.useCallback(async () => {
+    const workspaceId = activeProjectId
+    if (workspaceId === null) return
+    if (props.newSession === undefined) {
+      setSidebarNote(t('session.newUnavailable'))
+      return
+    }
+    const sessionId = await props.newSession(workspaceId)
+    if (sessionId === undefined) {
+      setSidebarNote(t('session.newUnavailable'))
+      return
+    }
+    setSidebarNote('')
+    open({ kind: 'session', contentId: sessionId, title: t('tab.session') })
+  }, [activeProjectId, open, props.newSession, t])
+
   const createTab = (kind: TabKind | 'openFile' | 'newProject') => {
     if (kind === 'openFile') {
       const path = window.prompt(t('menu.openFile'))
@@ -418,9 +517,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
       return
     }
     if (kind === 'session') {
-      const sessionId = project?.sessionIds[0]
-      if (sessionId === undefined) return
-      open({ kind: 'session', contentId: sessionId, title: t('tab.session') })
+      void openNewSession()
       return
     }
     if (kind === 'notes') {
@@ -703,6 +800,23 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
             <DropdownMenuItem icon={<FolderPlus className="h-3 w-3" />} onSelect={() => createTab('newProject')}>
               <span className="flex-1">{t('menu.newProject')}</span>
             </DropdownMenuItem>
+            {project !== undefined && project.sessionIds.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled className="text-faint">
+                  {t('session.history')}
+                </DropdownMenuItem>
+                {project.sessionIds.slice(0, 12).map((sessionId) => (
+                  <DropdownMenuItem
+                    key={sessionId}
+                    icon={<KindIcon kind="session" />}
+                    onSelect={() => open({ kind: 'session', contentId: sessionId, title: t('tab.session') })}
+                  >
+                    <span className="truncate">{`${t('tab.session')} · ${sessionId.slice(0, 8)}`}</span>
+                  </DropdownMenuItem>
+                ))}
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
         <DropdownMenu>
@@ -856,6 +970,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
             SessionProvider={(props as any).SessionProvider}
             renderSlot={(props as any).renderSlot}
             retainSession={props.retainSession}
+            retitle={retitle}
           />
         </Guarded>
       ) : (

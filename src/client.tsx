@@ -117,6 +117,25 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
     await add.call(service, path)
   }
   /**
+   * New session tab: the host owns "New Session" (`uiWorkspace.connectWorkspace`
+   * reuses an eligible blank or creates one and returns its id). No local state.
+   */
+  const newSession = async (workspaceId: string): Promise<string | undefined> => {
+    let service: { connectWorkspace?: (id: string) => Promise<string> } | undefined
+    try {
+      service = (ctx.get?.('uiWorkspace') ?? ctx.uiWorkspace) as typeof service
+    } catch {
+      service = undefined
+    }
+    if (typeof service?.connectWorkspace !== 'function') return undefined
+    try {
+      const created = await service.connectWorkspace(workspaceId)
+      return typeof created === 'string' && created !== '' ? created : undefined
+    } catch {
+      return undefined
+    }
+  }
+  /**
    * Status-bar appearance toggle. The host owns the preference — `setTheme` is
    * its only write entry (`light` / `dark` / `system`) — so there is no local
    * persistence here. With `system` active we flip away from what is resolved now.
@@ -259,6 +278,7 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
               appearance: () => appearanceOf(config),
               addProject,
               toggleTheme,
+              newSession,
               collapseHostSidebar,
               restoreHostSidebar,
             }),

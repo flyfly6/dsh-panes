@@ -74,4 +74,6 @@ export interface PanelProps {
   restoreHostSidebar?: () => void
   /** Flip the host theme preference (absent = host exposes no theme service). */
   toggleTheme?: () => void
+  /** Start a blank Session in a workspace (host's own New Session path). */
+  newSession?: (workspaceId: string) => Promise<string | undefined>
 }
