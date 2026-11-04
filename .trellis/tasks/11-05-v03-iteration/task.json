@@ -21,7 +21,8 @@
   "children": [
     "11-05-v03-appearance",
     "11-05-v03-notes",
-    "11-05-v03-drop-browser-tab"
+    "11-05-v03-drop-browser-tab",
+    "11-05-v03-explorer-split"
   ],
   "parent": null,
   "relatedFiles": [],
