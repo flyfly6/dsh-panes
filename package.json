@@ -33,11 +33,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/flyfly6/dsh-workspace.git"
+    "url": "git+https://github.com/flyfly6/dsh-panes.git"
   },
-  "homepage": "https://github.com/flyfly6/dsh-workspace#readme",
+  "homepage": "https://github.com/flyfly6/dsh-panes#readme",
   "bugs": {
-    "url": "https://github.com/flyfly6/dsh-workspace/issues"
+    "url": "https://github.com/flyfly6/dsh-panes/issues"
   },
   "publishConfig": {
     "access": "public",
