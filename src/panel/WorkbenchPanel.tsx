@@ -270,6 +270,191 @@ function EmbeddedConversation({
   )
 }
 
+/** Side chats live per main session: `<mainSessionId> -> [forked sessionId]`. */
+const SIDES_KEY = 'dsh-panes:sides'
+
+function readSides(mainId: string): string[] {
+  try {
+    const all = JSON.parse(window.localStorage.getItem(SIDES_KEY) ?? '{}') as Record<string, unknown>
+    const list = all?.[mainId]
+    return Array.isArray(list) ? list.map(String).filter((id) => id !== '') : []
+  } catch {
+    return []
+  }
+}
+
+function writeSides(mainId: string, list: string[]): void {
+  try {
+    const all = JSON.parse(window.localStorage.getItem(SIDES_KEY) ?? '{}') as Record<string, unknown>
+    const next = all !== null && typeof all === 'object' ? all : {}
+    if (list.length === 0) delete next[mainId]
+    else next[mainId] = list
+    window.localStorage.setItem(SIDES_KEY, JSON.stringify(next))
+  } catch {
+    /* private mode */
+  }
+}
+
+/**
+ * A session tab plus its side chats (T3). A side chat is a host fork of the main
+ * session, so it starts with the conversation's history and is a real session on
+ * its own. ponytail: fixed 380px dock (no drag), no quote/return-to-main plumbing
+ * (the Client exposes no composer writer) — the fork itself is the useful part.
+ */
+function SessionTabView({
+  sessionId,
+  SessionProvider,
+  renderSlot,
+  retainSession,
+  retitle,
+  forkSession,
+  t,
+}: {
+  sessionId: string
+  SessionProvider: React.ComponentType<any>
+  renderSlot: (key: string, owner: unknown) => React.ReactNode
+  retainSession: (sessionId: string) => { sessionId: string; release(): void }
+  retitle?: (title: string) => void
+  forkSession?: (sessionId: string) => Promise<string | undefined>
+  t: Translate
+}) {
+  const [sides, setSides] = React.useState<string[]>(() => readSides(sessionId))
+  const [side, setSide] = React.useState<string | undefined>(() => readSides(sessionId)[0])
+  const [dock, setDock] = React.useState(false)
+  const [busy, setBusy] = React.useState(false)
+
+  const update = (next: string[]) => {
+    setSides(next)
+    writeSides(sessionId, next)
+  }
+
+  const openSide = async () => {
+    if (forkSession === undefined || busy) return
+    setBusy(true)
+    try {
+      const created = await forkSession(sessionId)
+      if (created === undefined) return
+      update([...sides, created])
+      setSide(created)
+      setDock(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const closeSide = (id: string) => {
+    const next = sides.filter((entry) => entry !== id)
+    update(next)
+    if (side === id) setSide(next[next.length - 1])
+    if (next.length === 0) setDock(false)
+  }
+
+  /* Alt+S toggles the dock; skipped while typing so the host composer keeps it. */
+  React.useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!event.altKey || event.metaKey || event.ctrlKey || event.key.toLowerCase() !== 's') return
+      const target = event.target as HTMLElement | null
+      if (target?.isContentEditable === true) return
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName ?? '')) return
+      event.preventDefault()
+      setDock((open) => !open)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  return (
+    <div className="flex h-full min-h-0">
+      <div className="relative min-w-0 flex-1">
+        <EmbeddedConversation
+          sessionId={sessionId}
+          SessionProvider={SessionProvider}
+          renderSlot={renderSlot}
+          retainSession={retainSession}
+          retitle={retitle}
+        />
+        {!dock && forkSession !== undefined && (
+          <button
+            type="button"
+            onClick={() => setDock(true)}
+            title={t('side.toggle')}
+            className="absolute right-1.5 top-1.5 z-10 rounded border border-border bg-[var(--card)] px-1.5 py-0.5 text-2xs text-muted-foreground hover:text-foreground"
+          >
+            {t('side.title')}
+          </button>
+        )}
+      </div>
+      {dock && (
+        <aside className="flex w-[380px] shrink-0 flex-col border-l border-border" aria-label={t('side.title')}>
+          <div className="flex h-tab shrink-0 items-center gap-1 border-b border-border px-1.5">
+            <span className="shrink-0 text-2xs uppercase tracking-wide text-muted-foreground">{t('side.title')}</span>
+            <div className="wb-scroll flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+              {sides.map((id, index) => (
+                <span
+                  key={id}
+                  className={cn(
+                    'flex items-center gap-1 rounded px-1.5 py-0.5 text-xs',
+                    side === id ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <button type="button" onClick={() => setSide(id)} className="whitespace-nowrap">
+                    {`${t('side.item')} ${index + 1}`}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={t('side.closeItem')}
+                    className="grid h-3 w-3 shrink-0 place-items-center rounded hover:bg-accent"
+                    onClick={() => closeSide(id)}
+                  >
+                    <X className="h-2.5 w-2.5" aria-hidden />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              title={t('side.new')}
+              disabled={busy || forkSession === undefined}
+              onClick={() => void openSide()}
+            >
+              <Plus className="h-3 w-3" aria-hidden />
+            </Button>
+            <Button variant="ghost" size="icon" title={t('side.hide')} onClick={() => setDock(false)}>
+              <X className="h-3 w-3" aria-hidden />
+            </Button>
+          </div>
+          <div className="min-h-0 flex-1">
+            {side !== undefined ? (
+              <Guarded fallback={<SessionCard sessionId={side} onOpen={() => closeSide(side)} t={t} />}>
+                <EmbeddedConversation
+                  key={side}
+                  sessionId={side}
+                  SessionProvider={SessionProvider}
+                  renderSlot={renderSlot}
+                  retainSession={retainSession}
+                />
+              </Guarded>
+            ) : (
+              <div className="grid h-full place-content-center gap-2 px-4 text-center text-xs text-muted-foreground">
+                <span>{t('side.empty')}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy || forkSession === undefined}
+                  onClick={() => void openSide()}
+                >
+                  {t('side.start')}
+                </Button>
+              </div>
+            )}
+          </div>
+        </aside>
+      )}
+    </div>
+  )
+}
+
 function useDark(): boolean {
   const [dark, setDark] = React.useState(isDark)
   React.useEffect(() => {
@@ -1262,12 +1447,14 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
     return (
       (props as any).SessionProvider !== undefined && (props as any).renderSlot !== undefined && props.retainSession !== undefined ? (
         <Guarded fallback={<SessionCard sessionId={tab.contentId} onOpen={close} t={t} />}>
-          <EmbeddedConversation
+          <SessionTabView
             sessionId={tab.contentId}
             SessionProvider={(props as any).SessionProvider}
             renderSlot={(props as any).renderSlot}
             retainSession={props.retainSession}
             retitle={retitle}
+            forkSession={props.forkSession}
+            t={t}
           />
         </Guarded>
       ) : (

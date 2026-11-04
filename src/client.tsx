@@ -156,6 +156,25 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
     }
   }
   /**
+   * Side chat (T3): fork the current session so the copy keeps its history.
+   * Host `uiWorkspace.forkSession` is the only fork entry the Client exposes.
+   */
+  const forkSession = async (sessionId: string): Promise<string | undefined> => {
+    let service: { forkSession?: (id: string) => Promise<string> } | undefined
+    try {
+      service = (ctx.get?.('uiWorkspace') ?? ctx.uiWorkspace) as typeof service
+    } catch {
+      service = undefined
+    }
+    if (typeof service?.forkSession !== 'function') return undefined
+    try {
+      const created = await service.forkSession(sessionId)
+      return typeof created === 'string' && created !== '' ? created : undefined
+    } catch {
+      return undefined
+    }
+  }
+  /**
    * Status-bar appearance toggle. The host owns the preference — `setTheme` is
    * its only write entry (`light` / `dark` / `system`) — so there is no local
    * persistence here. With `system` active we flip away from what is resolved now.
@@ -303,6 +322,7 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
               pickDirectory,
               toggleTheme,
               newSession,
+              forkSession,
               collapseHostSidebar,
               restoreHostSidebar,
             }),

@@ -78,4 +78,6 @@ export interface PanelProps {
   toggleTheme?: () => void
   /** Start a blank Session in a workspace (host's own New Session path). */
   newSession?: (workspaceId: string) => Promise<string | undefined>
+  /** Fork a session into a side chat (T3); undefined when the host has no fork. */
+  forkSession?: (sessionId: string) => Promise<string | undefined>
 }

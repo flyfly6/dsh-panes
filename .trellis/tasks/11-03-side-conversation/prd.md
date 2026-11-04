@@ -53,3 +53,28 @@
 
 - 宿主不给 fork API → 侧聊价值下降（没有继承历史），需在发布说明里讲清楚，并优先向宿主提需求。
 - 划选与宿主自身的文本选择/复制交互冲突 → 只在「非输入框、选区非空」时出悬浮动作，且 `Esc` 可关。
+
+## 2026-11-05 实施记录（v1）
+
+宿主能力探测结果（`cordis_inspect_query` client Service 目录）：
+
+- `ctx.sessions.fork({ sessionId, atSeq?, increaseTitle?, allowMigration? }): Promise<SessionId>` ✅
+- `ctx.uiWorkspace.forkSession(sessionId, onCreated?, options?): Promise<SessionId>` ✅
+- 「主 composer 注入待发送消息」❌ —— 没有 `conversation.input` / composer controller 之类的写入口，
+  只有读（`binding.eventSource`）。R3 的"引用回流主输入框"失去宿主支撑。
+
+因此 v1 只交付"能就地聊"的部分，**R3 整条不做**：
+
+| 需求 | 状态 |
+|---|---|
+| R1 右栏 dock（380 固定宽）+ 收起 | ✅ `SessionTabView`；未做拖宽（320–480）与窄容器抽屉 |
+| R2 由主会话 fork、可多开（本会话内 N 个）、关闭即释放 retain | ✅ `ctx.uiWorkspace.forkSession`；持久化为 `localStorage['dsh-panes:sides']`（主会话 → 侧聊 id 列表），**不在宿主侧** |
+| R2 「保存为正式会话」入口 | ❌ 宿主已有别的入口（默认界面的会话列表），不做 |
+| R3 划选引用 / 结论回流 | ❌ 无 composer 写入口，见上 |
+| R3 折叠态未读指示条 | ❌ |
+| R4 复用 `SessionProvider` + `renderSlot('workbench.conversation')` | ✅ 与主会话同一条渲染路径 |
+| R5 降级：新建空会话 + 预填摘要 | 不需要（fork 存在），未实现 |
+
+`Alt+S` 切换 dock；焦点在 input/textarea/contenteditable 时不拦截（不抢宿主输入框的 ⌥S）。
+
+已知边界：侧聊 id 列表随 `localStorage` 走，清站点数据即丢（与 v0.2 之前的布局一个毛病；布局已迁宿主，侧聊列表还没）。
