@@ -1,6 +1,6 @@
 {
   "name": "dsh-panes",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Tabbed workspace panel for DeepSeek Harness: a project sidebar with per-project tabs for session, files, search, terminal, browser, source control and notes",
   "type": "module",
   "main": "./lib/index.js",
