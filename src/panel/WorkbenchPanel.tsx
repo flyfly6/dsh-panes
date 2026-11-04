@@ -45,7 +45,6 @@ import { Input } from '../ui/input'
 import { cn } from '../ui/cn'
 import { ExplorerView } from './ExplorerView'
 import { FileView } from './FileView'
-import { BrowserView } from './BrowserView'
 import { SessionCard } from './SessionCard'
 import { Guarded } from './Guarded'
 import { closeTerminalModel, TerminalView as TerminalPane, type TerminalModel } from './TerminalView'
@@ -397,7 +396,6 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
     { kind: 'explorer', label: t('tab.explorer'), icon: <KindIcon kind="explorer" /> },
     { kind: 'search', label: t('tab.search'), hint: '⌘⇧F', icon: <KindIcon kind="search" /> },
     { kind: 'terminal', label: t('tab.terminal'), icon: <KindIcon kind="terminal" /> },
-    { kind: 'browser', label: t('tab.browser'), icon: <KindIcon kind="browser" /> },
     { kind: 'git', label: t('tab.git'), icon: <KindIcon kind="git" /> },
     { kind: 'notes', label: t('tab.notes'), icon: <KindIcon kind="notes" /> },
   ]
@@ -410,10 +408,6 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
     }
     if (kind === 'newProject') {
       void addProjectFromPrompt()
-      return
-    }
-    if (kind === 'browser') {
-      open({ kind: 'browser', contentId: 'about:blank', title: t('tab.browser') })
       return
     }
     if (kind === 'terminal') {
@@ -867,31 +861,6 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
       ) : (
         <SessionCard sessionId={activeTab.contentId} onOpen={close} t={t} />
       )
-  } else if (activeTab.kind === 'browser') {
-    content = (
-      <BrowserView
-        url={activeTab.contentId}
-        t={t}
-        onNavigate={(url) =>
-          activeProjectId !== null &&
-          setLayout((prev) => {
-            const current = projectState(prev, activeProjectId)
-            return {
-              ...prev,
-              projects: {
-                ...prev.projects,
-                [activeProjectId]: {
-                  ...current,
-                  tabs: current.tabs.map((tab) =>
-                    tab.id === activeTab.id ? { ...tab, contentId: url, title: url.replace(/^https?:\/\//, '') } : tab,
-                  ),
-                },
-              },
-            }
-          })
-        }
-      />
-    )
   } else if (activeTab.kind === 'search') {
     content = (
       <SearchView

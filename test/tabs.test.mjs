@@ -121,6 +121,20 @@ test('a reload keeps plugin-registered kinds, drops a stale schema and garbage',
   const restored = parseLayout(raw)
   /* Unknown kinds survive: a registered tab type must outlive a page reload. */
   assert.deepEqual(projectState(restored, A).tabs.map((tab) => tab.kind), ['file', 'from-the-future'])
+  /* v0.3 removed the browser tab; an old layout must still load, minus that tab. */
+  const legacy = parseLayout(
+    JSON.stringify({
+      schemaVersion: 2,
+      activeProjectId: A,
+      projects: {
+        [A]: {
+          tabs: [{ kind: 'browser', contentId: 'https://example.com', title: 'example.com' }, { kind: 'file', contentId: 'a.ts', title: 'a.ts' }],
+          sidebar: { width: 248, collapsed: false },
+        },
+      },
+    }),
+  )
+  assert.deepEqual(projectState(legacy, A).tabs.map((tab) => tab.kind), ['file'])
   const garbage = parseLayout(
     JSON.stringify({
       schemaVersion: 2,

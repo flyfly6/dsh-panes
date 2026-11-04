@@ -14,7 +14,7 @@
 export type TabKind = string
 
 /** The kinds the shell itself knows how to build from the `+` menu. */
-export const BUILTIN_KINDS = ['session', 'file', 'explorer', 'search', 'terminal', 'browser', 'git', 'note', 'notes'] as const
+export const BUILTIN_KINDS = ['session', 'file', 'explorer', 'search', 'terminal', 'git', 'note', 'notes'] as const
 
 export interface TabModel {
   /** `${projectId}:${kind}:${contentId}` — dedupe key, also the React key. */
@@ -238,6 +238,10 @@ function parseTab(raw: unknown, projectId: string): TabModel[] {
   const entry = raw as Record<string, unknown>
   const kind = entry.kind
   if (typeof kind !== 'string' || kind.trim() === '') return []
+  /* v0.3 dropped the browser tab (a plugin cannot use `<webview>`: the host only
+     attaches its own leased guests). Old layouts keep loading; their browser
+     tabs are simply not restored. */
+  if (kind === 'browser') return []
   if (typeof entry.contentId !== 'string' || typeof entry.title !== 'string') return []
   return [
     {
