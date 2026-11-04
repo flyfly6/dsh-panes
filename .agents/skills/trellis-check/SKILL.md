@@ -1,111 +1,46 @@
 ---
 name: trellis-check
-description: "Comprehensive quality verification: spec compliance, lint, type-check, tests, cross-layer data flow, code reuse, and consistency checks. Use when code is written and needs quality verification, before committing changes, or to catch context drift during long sessions."
+description: "对照工程规范与任务产物验证代码改动：直接修复发现的问题，审查测试有效性（杜绝仅流程跑通但未验证业务不变量的假绿灯），并确保代码检查、类型检查与自动化测试全部通过。在完成实施向用户汇报前使用。"
 ---
 
-# Code Quality Check
+# trellis-check
 
-Comprehensive quality verification for recently written code. Combines spec compliance, cross-layer safety, and pre-commit checks.
+在每个实施阶段块结束时，以及提交代码前作为全量验证阶段运行本技能：对照规范与产物严格检验代码，就地修复发现的问题，确保全部测试绿灯且有效。
 
----
+## 规范上下文与质量门
 
-## Step 1: Identify What Changed
+先用 `.trellis/doc.json` 确认本次应检查的文档，而不是只替换路径关键字：
 
-```bash
-git diff --name-only HEAD
-git status
-```
+- `root`：Skill 的文档根目录，用于把 `$root/<package>/<layer>/index.md` 展开为实际路径。
+- `files`：运行时注入白名单，每项是项目根相对的完整 Markdown 路径；root 不参与它的拼接或过滤。
+- 先读 files 中与改动相关的规范；有导航/index 文件时先读导航，再沿链接找质量门。需要按 root 查目录时，先展开 `$root/...` 再读实际文件。
+- 无配置时使用默认 root 和原有目录结构；配置无效或文件缺失时报告并停止，不得回退另一份旧规范。
 
-## Step 2: Read Task Artifacts and Applicable Specs
+## 检查矩阵
 
-Read the current task artifacts in order:
+| 检查维度 | 执行命令 / 检查方式 | 通过标准 | 发现问题处理规则 |
+|---|---|---|---|
+| 1. 类型检查 | 如 `pnpm run type-check` 或 `tsc --noEmit` | 0 errors | 就地修复类型定义或类型断言问题 |
+| 2. 代码风格与规范 | 如 `pnpm run lint` | 0 errors | 能 auto-fix 的直接修复，其余就地手动调整 |
+| 3. 测试有效性审查 | 检查测试是否只照抄旧实现内部细节（刻舟求剑） | 测试对准接缝且断言业务不变量 | 若测试只是刻舟求剑，重写为外部接缝契约测试；严禁迁就坏测试打补丁 |
+| 4. 单元 / 集成测试 | 如 `pnpm test` 或运行对应测试文件 | 全部通过（绿灯） | 修复实现逻辑；若为需求变更同步更新对应单测 |
+| 5. PRD 验收标准 | 对照 `prd.md` 中的 Acceptance Criteria 逐条核对 | 100% 满足 | 若行为不符继续补齐逻辑 |
+| 6. 规范门禁 | 按上方“规范上下文”读取 files 与 `$root/...` 展开后的质量门 | 遵循分层依赖与约定 | 修正越界调用或非规范实现；配置模式不要回退未列入 files 的旧文档 |
 
-- `prd.md`
-- `design.md` if present
-- `implement.md` if present
+## 跨模块一致性与全量终审（Full-scope pass）
 
-```bash
-python ./.trellis/scripts/get_context.py --mode packages
-```
+- **跨包一致性**：当改动涉及多个分层或包时，逐个验证每个受影响包的质量门，防范中间迭代产生的联动问题。
+- **全量终审**：在进入 `commit` 阶段前，对所有受影响的包执行一次最终全量检查，杜绝局部验证未能捕获的隐患。
 
-For each changed package/layer, read the spec index and follow its **Quality Check** section:
+## 产物记录与反馈
 
-```bash
-cat .trellis/spec/<package>/<layer>/index.md
-```
+- **feat 轨道**：将检查命令、执行输出与验证结论记入 `review.md`。
+- **issue 轨道**：将测试结果与修复验证证据记入 `fix-note.md`。
+- **refactor 轨道**：将行为等价的回归验证记录记入 `apply-notes.md`。
 
-Read the specific guideline files referenced — the index is a pointer, not the goal.
+## 硬性卡点
 
-## Step 3: Run Project Checks
-
-Run the project's lint, type-check, and test commands. Fix any failures before proceeding.
-
-## Step 4: Review Against Checklist
-
-### Code Quality
-
-- [ ] Linter passes?
-- [ ] Type checker passes (if applicable)?
-- [ ] Tests pass?
-- [ ] No debug logging left in?
-- [ ] No suppressed warnings or type-safety bypasses?
-
-### Test Coverage
-
-- [ ] New function → unit test added?
-- [ ] Bug fix → regression test added?
-- [ ] Changed behavior → existing tests updated?
-
-### Spec Sync
-
-- [ ] Does `.trellis/spec/` need updates? (new patterns, conventions, lessons learned)
-
-> "If I fixed a bug or discovered something non-obvious, should I document it so future me won't hit the same issue?" → If YES, update the relevant spec doc.
-
-### Scope Discipline
-
-- [ ] Any tidying of code the task did not require?
-- [ ] Any abstraction, config or extension point added for a case that does not exist yet?
-- [ ] Any speculative fallback for a state that cannot occur?
-- [ ] Any file changed that the acceptance criteria do not mention?
-- [ ] Any workaround added at the caller instead of a fix where the behavior actually lives?
-
-## Step 5: Cross-Layer Dimensions (if applicable)
-
-Skip this step if your change is confined to a single layer.
-
-### A. Data Flow (changes touch 3+ layers)
-
-- [ ] Read flow traces correctly: Storage → Service → API → UI
-- [ ] Write flow traces correctly: UI → API → Service → Storage
-- [ ] Types/schemas correctly passed between layers?
-- [ ] Errors properly propagated to caller?
-
-### B. Code Reuse (modifying constants, creating utilities)
-
-- [ ] Searched for existing similar code before creating new?
-  ```bash
-  grep -r "pattern" src/
-  ```
-- [ ] If the same value repeats, does it represent one stable concept whose callers must change together? Extract only then — two literals that merely happen to match today should stay separate.
-- [ ] After batch modification, all occurrences updated?
-
-### C. Import/Dependency (creating new files)
-
-- [ ] Correct import paths (relative vs absolute)?
-- [ ] No circular dependencies?
-
-### D. Same-Layer Consistency
-
-- [ ] Other places using the same concept are consistent?
-
----
-
-## Step 6: Report and Fix
-
-Report every violation you find. Then:
-
-- Mechanical and local (lint nit, missing type, wrong import, dead branch, failing assertion) → fix in place, then re-run project checks.
-- Design or judgment (naming a shared concept, moving a module boundary, changing a public interface, reassigning where behavior lives) → record the evidence and your recommendation, and stop. Do not rewrite it silently.
-
-If a fix would touch files outside the current task's scope, say so and stop instead of widening the change.
+1. **就地修复原则（Auto-fix）**：发现机械性、类型或规范报错，不要只向用户汇报报错，必须直接修改代码并重新验证，直到全绿。
+2. **测试绿灯是必要条件而非充分条件**：除了工具无报错，代码改动必须逐条满足任务 PRD 声明的业务验收标准，且断言的是真实业务不变量。
+3. **严重缺陷退回规划**：若检查过程中暴露出 `prd.md` 存在严重的业务定义缺陷，必须退回规划阶段更新产物并重新实现，绝不能掩耳盗铃。
+4. **未全绿严禁收工**：任何检查项未通过前，严禁宣称任务完成或执行归档。

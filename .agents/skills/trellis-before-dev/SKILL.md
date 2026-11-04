@@ -1,51 +1,51 @@
 ---
 name: trellis-before-dev
-description: "Discovers and injects project-specific coding guidelines from .trellis/spec/ before implementation begins. Reads spec indexes, pre-development checklists, and shared thinking guides for the target package. Use when starting a new coding task, before writing any code, switching to a different package, or needing to refresh project conventions and standards."
+description: "在实施阶段修改代码前，研读项目规范与任务规划产物，确保代码改动严格遵循既定架构约定与需求标准。"
 ---
 
-Read the relevant development guidelines before starting your task.
+# trellis-before-dev
 
-Execute these steps:
+在方案获批、正式切入实施阶段（in_progress）修改代码前加载本技能。使所有编码工作严格建立在项目工程规范与已获批的规划产物基础之上，严禁凭主观习惯随意发挥。
 
-1. **Read current task artifacts**:
-   - `prd.md` for requirements and acceptance criteria
-   - `design.md` if present for technical design
-   - `implement.md` if present for execution order and validation plan
+## 规范上下文（先读）
 
-2. **Discover packages and their spec layers**:
-   ```bash
-   python ./.trellis/scripts/get_context.py --mode packages
-   ```
+项目可通过 `.trellis/doc.json` 同时提供文档根目录和注入清单：
 
-3. **Identify which specs apply** to your task based on:
-   - Which package you're modifying (e.g., `cli/`, `docs-site/`)
-   - What type of work (backend, frontend, unit-test, docs, etc.)
-   - Any spec/research paths referenced by the task artifacts
+```json
+{
+  "root": "docs",
+  "files": ["docs/agents/domain.md", "docs/quality/testing.md", "GLOSSARY.md"]
+}
+```
 
-4. **Read the spec index** for each relevant module:
-   ```bash
-   cat .trellis/spec/<package>/<layer>/index.md
-   ```
-   Follow the **"Pre-Development Checklist"** section in the index.
+- `root` 供 Skill 拼接文档路径：`$root/<package>/<layer>/index.md` 要解析成实际文件后再读；root 缺省时使用项目默认文档根目录。
+- `files` 是运行时注入白名单，必须是**项目根相对的完整 Markdown 路径**。不要写 `$root/...`，root 也不会替 files 做拼接或过滤。
+- `files` 可以包含 root 外的必要文档，例如上面的 `GLOSSARY.md`。
 
-5. **Read the specific guideline files** listed in the Pre-Development Checklist that are relevant to your task. The index is NOT the goal — it points you to the actual guideline files (e.g., `error-handling.md`, `conventions.md`, `mock-strategies.md`). Read those files to understand the coding standards and patterns.
+读取顺序：
 
-6. **Always read shared guides**:
-   ```bash
-   cat .trellis/spec/guides/index.md
-   ```
+1. 先读 `.trellis/doc.json`；无配置时使用默认 root 和项目原有目录结构。
+2. 先读 files 中与本次任务相关的文件；有导航/index 文档时先读导航，再沿链接读具体规范。
+3. 需要按 `$root/...` 找文档时，先展开成实际路径，再读取；不要把这个占位符当作文件名。
+4. 配置损坏、文件缺失或路径越界时停下说明，不要悄悄改读另一份旧规范。
 
-7. **For a non-trivial task, state the change boundary before writing code.** Non-trivial means it touches more than one file, crosses a layer, changes a public interface, or edits code you did not just write. Write down:
-   - the smallest behavior gap between what happens now and what should happen
-   - where that behavior actually lives (not where it is easiest to intercept)
-   - which files you expect to change, and why each one is necessary
-   - what you are explicitly not doing in this task
-   - if a local refactor is needed, how you will show it did not change behavior
+## 动手前检查清单
 
-   A small, well-scoped change does not need this — do it directly.
+| 检查维度 | 文件路径 | 核心关注内容 |
+|---|---|---|
+| 1. 项目工程规范 (Spec) | 按上方“规范上下文”读取 `.trellis/doc.json`、files 与 `$root/...` 展开后的实际文件 | 命名约定、分层依赖方向、错误处理机制、架构边界与质量门要求 |
+| 2. 业务需求与验收标准 | 当前任务下的 `prd.md` | 核心交付功能、边界场景、明确不做的项（Non-goals） |
+| 3. 技术设计方案 | 当前任务下的 `design.md`（如有） | 涉及模块边界、核心数据流、对外契约变更、既定验证命令与回滚策略 |
+| 4. 执行步骤清单 | 当前任务的 `task.json.steps` | 本步骤的具体验收指标、执行重点与验证方式（ai / human） |
+| 5. 调研参考资料 | 当前任务目录 `<task>/research/` | 前期收集的技术调研事实、API 文档摘录与复现样本 |
 
-   If the real scope turns out to be clearly larger than this, say so and why before continuing. Do not widen the change on your own.
+## 规范冲突与异常处理规则
 
-8. Understand the coding standards and patterns you need to follow, then proceed with your development plan.
+- **显式配置只认 files**：`root` 只是 Skill 元数据；注入范围是 `files`。文件内链接到的规范可以继续阅读，但没有列入 files 的新文档不会自动进入上下文，发现漏项时提示同步 `.trellis/doc.json`。
+- **项目风格高于个人习惯**：项目约定以配置的规范文件为准；若缺少特定规则，优先参考仓库中既有的代码风格与模式，严禁套用个人的主观习惯随意改造格式。
+- **方案与代码现状冲突**：若在写代码时发现已评审的方案与实际代码现状存在根本性冲突，**必须立刻停下向用户说明规范落差**，更新方案确认后再改，绝不擅自偏离规划或掩盖问题。
 
-This step is **mandatory** before writing any code.
+## 硬性卡点
+
+1. **先看清单后写码**：在写下第一行代码前，对照规范中的检查项与步骤验收条件。
+2. **严格单步推进**：按照 `task.json.steps` 逐步执行，做完一步验证一步，严禁一次性大爆炸修改。

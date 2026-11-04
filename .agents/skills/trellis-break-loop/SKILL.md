@@ -1,188 +1,44 @@
 ---
 name: trellis-break-loop
-description: "Deep bug analysis to break the fix-forget-repeat cycle. Analyzes root cause category, why fixes failed, prevention mechanisms, and captures knowledge into specs. Use after fixing a bug to prevent the same class of bugs."
+description: "打破反复调试死循环与测试水泥效应：当同一个问题改了两次以上、测试跑绿了但逻辑依然错误、怀疑设计有缺陷、或修了 A 坏了 B 时使用。深入推翻旧的错误设计，而不是继续打补丁。"
 ---
 
-# Break the Loop - Deep Bug Analysis
+# trellis-break-loop
 
-When debug is complete, use this for deep analysis to break the "fix bug -> forget -> repeat" cycle.
+当调试陷入反复拉锯时使用本技能——例如：
+1. 同一问题被修复了两次以上仍复发；
+2. **测试虽然跑绿了，但实际业务逻辑完全不对**（测试只验证了流程跑通，甚至把旧的坏设计当成真理锁死了）；
+3. 为了修一个 Bug，不得不引入第 3 个临时标志位（boolean flag）、或者跨层透传参数（架构坏味道）；
+4. 修好 A 坏了 B，出现回归扯皮。
 
----
+**遇到上述情况，立刻停下手头的修补工作，执行根本性深查。**
 
-## Analysis Framework
+## 止血排查六步走
 
-Analyze the bug you just fixed from these 5 dimensions:
+| 步骤 | 环节 | 具体操作 | 关键产出与要求 |
+|---|---|---|---|
+| 1. 立刻停手 | 止血 | 停止盲目尝试打局部补丁或增加特殊分支 | 别再凭猜想盲改代码，防止污染现场或堆积代码屎山 |
+| 2. 审查测试水泥效应 | 区分测试性质 | 审视现有测试是“断言业务不变量”还是“照抄旧实现细节” | 识别出刻舟求剑的浅层实现测试，果断推翻并标记重写 |
+| 3. 编写必现用例 | 稳定复现 | 编写一个能稳定复现真实 Bug 的最小单测、脚本或精确步骤 | 失败的测试用例（红灯）；**无法稳定复现前，绝不动业务代码** |
+| 4. 复盘前期尝试 | 失效分析 | 逐一审视之前的每一次修复尝试，记录于 `analysis.md` | 查明为何没能触及真因：时序异步、缓存未失效、分层找错、副作用未清理等 |
+| 5. 推翻旧设计（两次设计） | 重新设计接缝 | 若根因在于设计缺陷，抛开现有实现，在白板上做两次平行设计（Design-It-Twice） | 采用 **Replace, Don't Layer** 原则；以“深模块（Deep Module）”标准重构接缝 |
+| 6. 彻底修复与防复发 | 治本与验证 | 修改根源机制或替换旧模块，跑通复现单测与既有全量测试 | 测试全部转绿；提炼防坑说明写入规范（Spec Note）杜绝未来重蹈覆辙 |
 
-### 1. Root Cause Category
+## 核心心智：破除“测试水泥效应”
 
-Which category does this bug belong to?
+- **测试不等于真理**：浅层测试（Implementation Echo Test）往往只是把旧代码的内部类调用、中间数据字段抄了一遍。只要流程走通它就变绿，但底层状态模型完全是畸形的。
+- **敢于删除与重写测试**：当重构或修复涉及根本设计时，那些迁就旧坏设计的浅层测试**必须随旧代码一同被删除**。只保留对准外部接缝（External Seam）的“领域不变量测试（Invariant Test）”。
+- **拒绝包装千层饼（Replace, Don't Layer）**：面对坏设计，不要在外面包一层 Adapter 或兼容 Wrapper，那只会延缓崩塌。评估通过删除测试（The Deletion Test）后，直接彻底替换。
 
-| Category | Characteristics | Example |
-|----------|-----------------|---------|
-| **A. Missing Spec** | No documentation on how to do it | New feature without checklist |
-| **B. Cross-Layer Contract** | Interface between layers unclear | API returns different format than expected |
-| **C. Change Propagation Failure** | Changed one place, missed others | Changed function signature, missed call sites |
-| **D. Test Coverage Gap** | Unit test passes, integration fails | Works alone, breaks when combined |
-| **E. Implicit Assumption** | Code relies on undocumented assumption | Timestamp seconds vs milliseconds |
+## 产物与沉淀
 
-### 2. Why Fixes Failed (if applicable)
+- 将复盘分析、失效机制与长效方案持久化记录到任务目录下的 `analysis.md` 或 `research/` 资料中。
+- 在任务收尾时，通过 `trellis-update-spec` 将本次教训转化为工程规范，确保团队与 Agent 不再踩坑。
 
-If you tried multiple fixes before succeeding, analyze each failure:
+## 硬性卡点
 
-- **Surface Fix**: Fixed symptom, not root cause
-- **Incomplete Scope**: Found root cause, didn't cover all cases
-- **Tool Limitation**: grep missed it, type check wasn't strict
-- **Mental Model**: Kept looking in same layer, didn't think cross-layer
-
-### 3. Prevention Mechanisms
-
-What mechanisms would prevent this from happening again?
-
-| Type | Description | Example |
-|------|-------------|---------|
-| **Documentation** | Write it down so people know | Update thinking guide |
-| **Architecture** | Make the error impossible structurally | Type-safe wrappers |
-| **Compile-time** | Strict type checking, no escape hatches | Signature change causes compile error |
-| **Runtime** | Monitoring, alerts, scans | Detect orphan entities |
-| **Test Coverage** | E2E tests, integration tests | Verify full flow |
-| **Code Review** | Checklist, PR template | "Did you check X?" |
-
-### 4. Systematic Expansion
-
-What broader problems does this bug reveal?
-
-- **Similar Issues**: Where else might this problem exist?
-- **Design Flaw**: Is there a fundamental architecture issue?
-- **Process Flaw**: Is there a development process improvement?
-- **Knowledge Gap**: Is the team missing some understanding?
-
-### 5. Knowledge Capture
-
-Solidify insights into the system:
-
-- [ ] Update `.trellis/spec/guides/` thinking guides
-- [ ] Update relevant `.trellis/spec/` docs
-- [ ] Create issue record (if applicable)
-- [ ] Create feature ticket for root fix
-- [ ] Update check guidelines if needed
-
----
-
-## Output Format
-
-Please output analysis in this format:
-
-```markdown
-## Bug Analysis: [Short Description]
-
-### 1. Root Cause Category
-- **Category**: [A/B/C/D/E] - [Category Name]
-- **Specific Cause**: [Detailed description]
-
-### 2. Why Fixes Failed (if applicable)
-1. [First attempt]: [Why it failed]
-2. [Second attempt]: [Why it failed]
-...
-
-### 3. Prevention Mechanisms
-| Priority | Mechanism | Specific Action | Status |
-|----------|-----------|-----------------|--------|
-| P0 | ... | ... | TODO/DONE |
-
-### 4. Systematic Expansion
-- **Similar Issues**: [List places with similar problems]
-- **Design Improvement**: [Architecture-level suggestions]
-- **Process Improvement**: [Development process suggestions]
-
-### 5. Knowledge Capture
-- [ ] [Documents to update / tickets to create]
-```
-
----
-
-## Core Philosophy
-
-> **The value of debugging is not in fixing the bug, but in making this class of bugs never happen again.**
-
-Three levels of insight:
-1. **Tactical**: How to fix THIS bug
-2. **Strategic**: How to prevent THIS CLASS of bugs
-3. **Philosophical**: How to expand thinking patterns
-
-30 minutes of analysis saves 30 hours of future debugging.
-
-## Thinking Framework: Bayesian Reasoning
-
-When multiple root causes are plausible and evidence is incomplete, update your beliefs proportionally to new evidence rather than clinging to initial assumptions.
-
-### Step 1: Establish Priors
-
-Before investigating, state what you believe and why:
-
-| Hypothesis | Prior | Reasoning |
-|------------|-------|-----------|
-| H1: [cause A] | 40% | Most common for this pattern |
-| H2: [cause B] | 30% | Plausible given environment |
-| H3: [other] | 30% | Catch-all |
-
-Priors must sum to 100%. If you can't assign probabilities, investigate first.
-
-### Step 2: Observe Evidence
-
-Document what you found — be specific about reliability:
-
-- What exactly did you observe?
-- How reliable? (test output > log message > user report > hunch)
-- Could multiple hypotheses explain this?
-
-### Step 3: Update Beliefs
-
-For each hypothesis, ask: **How likely is this evidence if this hypothesis were true?**
-
-Direction of update matters more than calculation:
-- Evidence strongly predicted by H1 → H1 probability increases
-- Evidence contradicts H2 → H2 probability decreases
-- Evidence equally likely under all → no update
-
-### Step 4: Seek Discriminating Evidence
-
-Don't gather more of the same. Find evidence that **differs strongly** between top hypotheses.
-
-> If H1 and H3 are close: "What would I see if H1 is true but not if H3 is true?" Then check for that.
-
-### Step 5: State Confidence
-
-| Confidence | Action |
-|------------|--------|
-| 90%+ | Proceed with fix, monitor |
-| 70-90% | Proceed, add fallback check |
-| 50-70% | Test hypothesis before committing |
-| <50% | Need more evidence, don't guess |
-
-Never express binary certainty when evidence is incomplete. Use "most likely", "plausible but unlikely", "worth investigating".
-
-### Common Fallacies
-
-| Fallacy | Example | Correction |
-|---------|---------|------------|
-| **Base rate neglect** | "Test failed → code is broken" | How often do tests fail for other reasons? |
-| **Confirmation bias** | "Must be a race condition, let me find race evidence" | Actively seek evidence AGAINST your top hypothesis |
-| **Anchoring** | "Last time it was caching, probably caching again" | Establish priors from current context, not yesterday's bug |
-
----
-
-## After Analysis: Immediate Actions
-
-**IMPORTANT**: After completing the analysis above, you MUST immediately:
-
-1. **Update spec/guides** - Don't just list TODOs, actually update the relevant files:
-   - If it's a cross-platform issue → update `cross-platform-thinking-guide.md`
-   - If it's a cross-layer issue → update `cross-layer-thinking-guide.md`
-   - If it's a code reuse issue → update `code-reuse-thinking-guide.md`
-   - If it's domain-specific → update `backend/*.md` or `frontend/*.md`
-
-2. **Sync templates** - After updating `.trellis/spec/`, sync to `src/templates/markdown/spec/`
-
-3. **Commit the spec updates** - This is the primary output, not just the analysis text
-
-> **The analysis is worthless if it stays in chat. The value is in the updated specs.**
+1. **写不出复现用例/无明确复现步骤，坚决不改代码**。
+2. **严禁在报错处简单套 try-catch 或加判空来掩盖问题**。
+3. **严禁为了迎合旧的浅层测试而强行扭曲新架构设计**。
+4. **彻底搞清真因后，先向用户说清根因与方案，再动手修改**。
+5. **必须将结论沉淀到磁盘文件**：聊天上下文会被压缩截断，但磁盘产物不会丢失。

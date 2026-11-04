@@ -1,356 +1,68 @@
 ---
 name: trellis-update-spec
-description: "Captures executable contracts and coding conventions into .trellis/spec/ documents. Use when learning something valuable from debugging, implementing, or discussion that should be preserved for future sessions."
+description: "复盘任务是否沉淀了值得写入工程规范的新认知：提炼新发现的编码模式、避免复发的踩坑教训与关键技术决策。即使结论为无需更新，也需显式走完判断逻辑。"
 ---
 
-# Update Code-Spec - Capture Executable Contracts
+# trellis-update-spec
 
-When you learn something valuable (from debugging, implementing, or discussion), use this to update the relevant code-spec documents.
+在实施收尾（Phase 3 代码提交前）运行本技能，将当前任务中积累的经验与避坑教训转化为项目工程规范（Spec），沉淀为团队与 Agent 的长期资产。
 
-**Timing**: After completing a task, fixing a bug, or discovering a new pattern
+## 先定位规范入口
 
----
+`.trellis/doc.json` 同时包含两类信息，不能混用：
 
-## Code-Spec First Rule (CRITICAL)
-
-In this project, "spec" for implementation work means **code-spec**:
-- Executable contracts (not principle-only text)
-- Concrete signatures, payload fields, env keys, and boundary behavior
-- Testable validation/error behavior
-
-If the change touches infra or cross-layer contracts, code-spec depth is mandatory.
-
-### Mandatory Triggers
-
-Apply code-spec depth when the change includes any of:
-- New/changed command or API signature
-- Cross-layer request/response contract change
-- Database schema/migration change
-- Infra integration (storage, queue, cache, secrets, env wiring)
-
-### Mandatory Output (7 Sections)
-
-For triggered tasks, include all sections below:
-1. Scope / Trigger
-2. Signatures (command/API/DB)
-3. Contracts (request/response/env)
-4. Validation & Error Matrix
-5. Good/Base/Bad Cases
-6. Tests Required (with assertion points)
-7. Wrong vs Correct (at least one pair)
-
----
-
-## When to Update Code-Specs
-
-| Trigger | Example | Target Spec |
-|---------|---------|-------------|
-| **Implemented a feature** | Added a new integration or module | Relevant spec file |
-| **Made a design decision** | Chose extensibility pattern over simplicity | Relevant spec + "Design Decisions" section |
-| **Fixed a bug** | Found a subtle issue with error handling | Relevant spec (e.g., error-handling docs) |
-| **Discovered a pattern** | Found a better way to structure code | Relevant spec file |
-| **Hit a gotcha** | Learned that X must be done before Y | Relevant spec + "Common Mistakes" section |
-| **Established a convention** | Team agreed on naming pattern | Quality guidelines |
-| **New thinking trigger** | "Don't forget to check X before doing Y" | `guides/*.md` (as a checklist item) |
-
-**Key Insight**: Code-spec updates are NOT just for problems. Every feature implementation contains design decisions and contracts that future AI/developers need to execute safely.
-
----
-
-## Spec Structure Overview
-
-```
-.trellis/spec/
-├── <layer>/           # Per-layer coding standards (e.g., backend/, frontend/, api/)
-│   ├── index.md       # Overview and links
-│   └── *.md           # Topic-specific guidelines
-└── guides/            # Thinking checklists (NOT coding specs!)
-    ├── index.md       # Guide index
-    └── *.md           # Topic-specific guides
+```json
+{
+  "root": "docs",
+  "files": ["docs/agents/domain.md", "docs/quality/testing.md", "GLOSSARY.md"]
+}
 ```
 
-### CRITICAL: Code-Spec vs Guide - Know the Difference
-
-| Type | Location | Purpose | Content Style |
-|------|----------|---------|---------------|
-| **Code-Spec** | `<layer>/*.md` | Tell AI "how to implement safely" | Signatures, contracts, matrices, cases, test points |
-| **Guide** | `guides/*.md` | Help AI "what to think about" | Checklists, questions, pointers to specs |
-
-**Decision Rule**: Ask yourself:
-
-- "This is **how to write** the code" → Put in a spec layer directory
-- "This is **what to consider** before writing" → Put in `guides/`
-
-**Example**:
-
-| Learning | Wrong Location | Correct Location |
-|----------|----------------|------------------|
-| "Use API X not API Y for this task" | ❌ `guides/` (too specific for a thinking guide) | ✅ Relevant spec file (concrete convention) |
-| "Remember to check X when doing Y" | ❌ Spec file (too abstract for a spec) | ✅ `guides/` (thinking checklist) |
-
-**Guides should be short checklists that point to specs**, not duplicate the detailed rules.
-
----
-
-## Update Process
-
-### Step 1: Identify What You Learned
-
-Answer these questions:
-
-1. **What did you learn?** (Be specific)
-2. **Why is it important?** (What problem does it prevent?)
-3. **Where does it belong?** (Which spec file?)
-
-### Step 2: Classify the Update Type
-
-| Type | Description | Action |
-|------|-------------|--------|
-| **Design Decision** | Why we chose approach X over Y | Add to "Design Decisions" section |
-| **Project Convention** | How we do X in this project | Add to relevant section with examples |
-| **New Pattern** | A reusable approach discovered | Add to "Patterns" section |
-| **Forbidden Pattern** | Something that causes problems | Add to "Anti-patterns" or "Don't" section |
-| **Common Mistake** | Easy-to-make error | Add to "Common Mistakes" section |
-| **Convention** | Agreed-upon standard | Add to relevant section |
-| **Gotcha** | Non-obvious behavior | Add warning callout |
-
-### Step 3: Read the Target Code-Spec
-
-Before editing, read the current code-spec to:
-- Understand existing structure
-- Avoid duplicating content
-- Find the right section for your update
-
-```bash
-cat .trellis/spec/<category>/<file>.md
-```
-
-### Step 4: Make the Update
-
-Follow these principles:
-
-1. **Be Specific**: Include concrete examples, not just abstract rules
-2. **Explain Why**: State the problem this prevents
-3. **Show Contracts**: Add signatures, payload fields, and error behavior
-4. **Show Code**: Add code snippets for key patterns
-5. **Keep it Short**: One concept per section
-
-### Step 5: Update the Index (if needed)
-
-If you added a new section or the code-spec status changed, update the category's `index.md`.
-
----
-
-## Update Templates
-
-### Mandatory Template for Infra/Cross-Layer Work
-
-```markdown
-## Scenario: <name>
-
-### 1. Scope / Trigger
-- Trigger: <why this requires code-spec depth>
-
-### 2. Signatures
-- Backend command/API/DB signature(s)
-
-### 3. Contracts
-- Request fields (name, type, constraints)
-- Response fields (name, type, constraints)
-- Environment keys (required/optional)
-
-### 4. Validation & Error Matrix
-- <condition> -> <error>
-
-### 5. Good/Base/Bad Cases
-- Good: ...
-- Base: ...
-- Bad: ...
-
-### 6. Tests Required
-- Unit/Integration/E2E with assertion points
-
-### 7. Wrong vs Correct
-#### Wrong
-...
-#### Correct
-...
-```
-
-### Adding a Design Decision
-
-```markdown
-### Design Decision: [Decision Name]
-
-**Context**: What problem were we solving?
-
-**Options Considered**:
-1. Option A - brief description
-2. Option B - brief description
-
-**Decision**: We chose Option X because...
-
-**Example**:
-\`\`\`typescript
-// How it's implemented
-code example
-\`\`\`
-
-**Extensibility**: How to extend this in the future...
-```
-
-### Adding a Project Convention
-
-```markdown
-### Convention: [Convention Name]
-
-**What**: Brief description of the convention.
-
-**Why**: Why we do it this way in this project.
-
-**Example**:
-\`\`\`typescript
-// How to follow this convention
-code example
-\`\`\`
-
-**Related**: Links to related conventions or specs.
-```
-
-### Adding a New Pattern
-
-```markdown
-### Pattern Name
-
-**Problem**: What problem does this solve?
-
-**Solution**: Brief description of the approach.
-
-**Example**:
-\`\`\`
-// Good
-code example
-
-// Bad
-code example
-\`\`\`
-
-**Why**: Explanation of why this works better.
-```
-
-### Adding a Forbidden Pattern
-
-```markdown
-### Don't: Pattern Name
-
-**Problem**:
-\`\`\`
-// Don't do this
-bad code example
-\`\`\`
-
-**Why it's bad**: Explanation of the issue.
-
-**Instead**:
-\`\`\`
-// Do this instead
-good code example
-\`\`\`
-```
-
-### Adding a Common Mistake
-
-```markdown
-### Common Mistake: Description
-
-**Symptom**: What goes wrong
-
-**Cause**: Why this happens
-
-**Fix**: How to correct it
-
-**Prevention**: How to avoid it in the future
-```
-
-### Adding a Gotcha
-
-```markdown
-> **Warning**: Brief description of the non-obvious behavior.
->
-> Details about when this happens and how to handle it.
-```
-
----
-
-## Interactive Mode
-
-If you're unsure what to update, answer these prompts:
-
-1. **What did you just finish?**
-   - [ ] Fixed a bug
-   - [ ] Implemented a feature
-   - [ ] Refactored code
-   - [ ] Had a discussion about approach
-
-2. **What did you learn or decide?**
-   - Design decision (why X over Y)
-   - Project convention (how we do X)
-   - Non-obvious behavior (gotcha)
-   - Better approach (pattern)
-
-3. **Would future AI/developers need to know this?**
-   - To understand how the code works → Yes, update spec
-   - To maintain or extend the feature → Yes, update spec
-   - To avoid repeating mistakes → Yes, update spec
-   - Purely one-off implementation detail → Maybe skip
-
-4. **Which area does it relate to?**
-   - [ ] Backend code
-   - [ ] Frontend code
-   - [ ] Cross-layer data flow
-   - [ ] Code organization/reuse
-   - [ ] Quality/testing
-
----
-
-## Quality Checklist
-
-Before finishing your code-spec update:
-
-- [ ] Is the content specific and actionable?
-- [ ] Did you include a code example?
-- [ ] Did you explain WHY, not just WHAT?
-- [ ] Did you include executable signatures/contracts?
-- [ ] Did you include validation and error matrix?
-- [ ] Did you include Good/Base/Bad cases?
-- [ ] Did you include required tests with assertion points?
-- [ ] Is it in the right code-spec file?
-- [ ] Does it duplicate existing content?
-- [ ] Would a new team member understand it?
-
----
-
-## Relationship to Other Commands
-
-```
-Development Flow:
-  Learn something → `update-spec` (Trellis command) → Knowledge captured
-       ↑                                  ↓
-  `break-loop` (Trellis command) ←──────────────────── Future sessions benefit
-  (deep bug analysis)
-```
-
-- ``break-loop` (Trellis command)` - Analyzes bugs deeply, often reveals spec updates needed
-- ``update-spec` (Trellis command)` - Actually makes the updates
-- ``finish-work` (Trellis command)` - Reminds you to check if specs need updates
-
----
-
-## Core Philosophy
-
-> **Code-specs are living documents. Every debugging session, every "aha moment" is an opportunity to make the implementation contract clearer.**
-
-The goal is **institutional memory**:
-- What one person learns, everyone benefits from
-- What AI learns in one session, persists to future sessions
-- Mistakes become documented guardrails
+- **`root` 是 Skill 的文档根目录**：用于把 `$root/<package>/<layer>/`、`$root/guides/index.md`、`$root/decisions/` 展开为实际读写路径。例如上面的 `$root/guides/index.md` 就是 `docs/guides/index.md`。
+- **`files` 是运行时注入白名单**：每项必须是项目根相对的完整 Markdown 路径。不要把 `$root/...` 写进 files；root 不参与 files 的拼接或过滤。files 可以包含 root 外的文档，例如 `GLOSSARY.md`。
+- **无配置时**：使用默认 root 和项目原有目录结构，仍按同样的展开规则查找。
+
+读取与写入顺序：
+
+1. 先读 `.trellis/doc.json`，再读 files 中与本次任务相关的文件；有导航/index 文件时先读导航，再沿链接找具体权威文档。
+2. 需要按 `$root/...` 找或写文档时，先展开为实际路径，再读写；不要把占位符当成文件名。
+3. 新建应长期注入的文档后，把它的**完整项目相对路径**追加到 files；只更新已列入文件正文则无需改配置。
+4. 配置损坏、文件缺失、路径越界或归属不明时停下询问或修复，不静默写回另一份旧规范。
+
+## 价值判断维度
+
+审视本次任务是否产生了值得书面沉淀的客观知识：
+
+| 评估维度 | 关注重点 | 记录落脚点 | 处理动作 |
+|---|---|---|---|
+| **1. 新模式与新约定** | 项目中应当长期保持的设计模式、统一目录结构、接口范式 | `$root/<package>/<layer>/` 下的指引文件 | 扩充既有指引，或新建文件并在该层 `index.md` 建立索引 |
+| **2. 技术深坑与陷阱** | 本次踩过的隐蔽 Bug、框架特殊怪癖、时区/时序陷阱 | 同上模块指引，或记录在 `guides/` | 记录原因与正确写法，杜绝未来重蹈覆辙 |
+| **3. 关键架构技术决策** | 重大的技术选型、重大依赖替换及其权衡考量 | `$root/decisions/`（ADR 记录） | 记录决策背景、备选方案与最终采纳理由 |
+| **4. 常规日常修改** | 无新坑点、无新规矩，属于标准业务逻辑开发 | 汇报中说明“无需更新规范” | **显式走完评估逻辑，直接跳过，严禁无病呻吟** |
+
+> 配置模式下，把表中默认落点替换为 files 与根导航中的对应权威文档；无配置时保持原表行为。
+
+## 沉淀落脚点与执行步骤
+
+1. **落脚点结构**：
+   - **规范文件**：`$root/<package>/<layer>/`——要么扩充既有指引文件，要么新建并在模块索引 `index.md` 中建立链接；
+   - **共享指引**：`$root/guides/index.md`。
+   - **配置模式**：优先更新 files 指向的已有权威文档；不要默认新建一套平行 Spec。
+2. **执行步骤**：
+   - 对照上述维度系统审阅任务产物与本次实际代码改动；
+   - **显式决策与记录**：若有明确成果，写入对应 spec 文件；若属于常规改动无新增知识，**在总结中依然显式说明已做过评估**（表明已认真评估而非无视流程）；
+   - 保持规范条目紧凑精准，与真实代码强绑定；若新建了指引，必须同步更新所属分层的 `index.md`。
+3. **配置模式写入规则**：
+   - **优先更新已有权威文档**：沿 files 与根 Index 的链接确定归属，不默认另建一套平行规范；
+   - **新增需要注入的文档必须同步 files**：新建应长期进入上下文的 Markdown 后，把项目根相对完整路径加入 `.trellis/doc.json` 的 files；只更新已列入文件正文无需改配置；
+   - **归属不明就问**：无法判断应写 ADR、Domain、Architecture 还是 Quality 时，向用户提出一个具体选择，不静默写回旧目录；
+   - **配置无效先修复**：files 指向缺失/越界/非 Markdown，或 root 不是项目内目录时，停止写入并提示运行 `trellis-spec-bootstrap`。
+
+## 硬性卡点
+
+1. **规范必须是具备指导意义的通用约定**：切勿把零碎的业务实现代码当成规范抄录。
+2. **规范沉淀与业务代码同批提交**：属于本任务提交流程的一部分，严禁拖延成“以后再补”。
+3. **严重底层机制 Bug 必须先沉淀说明**：若本任务修复了一个揭示底层机制缺陷的深坑，必须先在 spec 中沉淀根因说明与避坑建议，再行提交代码。
+4. **切忌为了更新而更新**：没有新认知就直接判定为“无需更新”，严禁编写假大空的口号。
+5. **files 与正文同批维护**：新建需注入文档却不更新 files，视为规范沉淀未完成。
+6. **不静默写回旧目录**：配置模式归属不明时必须询问用户，禁止默认写回未列入 files 的旧目录。

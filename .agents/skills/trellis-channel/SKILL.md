@@ -1,67 +1,41 @@
 ---
 name: trellis-channel
-description: Use Trellis channel for live multi-agent collaboration, spawned workers, cross-agent review, progress inspection, forum channels, and channel log debugging.
+description: "多代理协作通道调度：协调子代理职责、进度汇报、共享上下文与任务交接。适用于将复杂任务拆解给多个并行工作代理时。"
 ---
 
 # trellis-channel
 
-`trellis channel` is the local multi-agent collaboration runtime. Reach for it when agents need to talk through a durable event log, when a worker should be spawned as a peer process, when an in-flight worker needs interrupt / debugging, or when feedback should be recorded on a durable `--type forum` channel.
+当复杂任务被拆分为多个可独立验证的代码块，并由多个子代理（subagent / teammate）协同推进时，使用本技能进行协调管控。
 
-Typical user signals: "和 codex/claude 讨论", "brainstorm with another agent", "spawn an implement/check worker", "let agent review", "open an issue board / changelog forum", "look at this thread", "channel is stuck / no output", "progress was truncated", "how do I write that channel command".
+## 协作核心原则
 
-This skill is an index. Load only the reference file for the current job — do not preload all of them.
+- **统一权威的单一共享上下文**：事实源始终以磁盘文件与任务产物（Artifacts）为准，而非零散漫无边际的聊天记录。工作代理先读产物，完工后以产物形式汇报。
+- **独立可验证的交付单元**：每个子代理拥有独立可自测的交付件；任务依赖关系必须在产物与步骤元数据中显式声明，而非依赖隐式的树状顺序推断。
+- **轻量客观的进度汇报**：以结构化状态（完成 / 阻塞 / 下一步）配合具体文件改动进行汇报，避免通篇主观叙事。
 
-## First Commands
+## 协作工作流
 
-```bash
-trellis --version
-trellis channel --help
-trellis channel list --all
-trellis channel list --scope global --all
+| 环节 | 操作目标 | 具体动作 | 关键要求 |
+|---|---|---|---|
+| 1. 任务拆解 | 建立任务拓扑 | 建立负责顶层需求与集成验收的父任务，以及负责独立可验证交付件的子任务 | **划分互不重叠的写作用域**，严禁并行修改同一文件 |
+| 2. 规范派发 | 派发子代理 | 每次派发时 Prompt 必须指明当前任务路径与交付目标 | 开头带 `Active task: ...`，指明参考产物与允许修改的文件列表 |
+| 3. 产物交接 | 完工汇报 | 子代理完工后以实际文件改动与验证结论进行汇报 | 说明改动文件、运行测试与未竟事项，不写大段叙事 |
+| 4. 汇总仲裁 | 主控收口 | 主控代理汇总进度，更新 `task.json.steps` | 在共享上下文中解决可能的逻辑或代码冲突 |
+| 5. 集成验收 | 终审检验 | 所有子任务完结后，由父任务执行集成回归测试 | 对照跨模块验收标准，全量跑通 `trellis-check` |
+
+## 派单 Prompt 模板
+
+```text
+Active task: .trellis/tasks/<slug>
+目标：实现 <具体的模块/函数>
+参考产物：.trellis/tasks/<slug>/design.md
+允许修改的文件范围：<明确的文件路径列表>
+验收标准：编写对应测试并运行通过，保证零回归
 ```
 
-If the user names a channel or thread, inspect it before asking for background:
+## 硬性卡点
 
-```bash
-trellis channel forum <board> --scope global
-trellis channel thread <board> <thread> --scope global
-trellis channel context list <board> --scope global --thread <thread>
-```
-
-## Route By User Intent
-
-| User intent | Read |
-|---|---|
-| "和 codex/claude 讨论一下", "brainstorm with another agent" | `references/workflows.md` |
-| "派一个 implement/check agent", "让 agent review", "spawn a worker" | `references/workflows.md`, then `references/workers.md` |
-| "开 issue 区 / topic 群 / changelog / board", "make a forum" | `references/forum.md` |
-| "看看这个 thread / linked context", "inspect a thread" | `references/forum.md` |
-| "channel 卡住了 / 没输出 / progress 被截断", "worker stalled" | `references/progress-debugging.md` |
-| "具体命令怎么写", "what flags does X take" | `references/command-reference.md` |
-
-## Core Rules
-
-- New forum channels use `--type forum`. A `thread` is one item inside a forum channel.
-- Use `--context-file` / `--context-raw` and `trellis channel context add/delete/list`. `--linked-context-*` is deprecated terminology.
-- Use `--stdin` or `--text-file` for long messages. Do not put long mixed Chinese/English text in the positional shell argument.
-- Pretty `messages` output is an operator dashboard and may truncate progress. Use `--raw` for audit.
-- `--as` is the speaker or worker handle, depending on the command. Use explicit, stable names when multiple agents or sessions are involved.
-- `--scope project` (default) operates on the current cwd's project bucket; `--scope global` operates on the shared `__global__` bucket. Pick scope deliberately — a global board is invisible from project listings unless `--scope global` is passed.
-- For brainstorm, do multiple pressure-test rounds. One answer plus one confirmation is review, not brainstorm.
-- **Dispatcher wait pattern**: use `--kind done` / `--kind turn_finished` (trellis-emitted system events), NOT a user `--tag` as the completion signal. CLI help lists `phase_done` / `question` as `--tag` examples but only `interrupt` is a reserved tag with hardcoded trellis behavior; the others are opaque user labels. Relying on a worker to run `send --tag <my_signal>` is unreliable — LLM workers commonly write the tag string into prose instead of running the actual CLI command. See `references/command-reference.md` "tag vs kind".
-- Forum channels are event-sourced. Do not parse `events.jsonl` first; use `forum`, `thread`, `messages --thread`, and `context list`.
-- `@mindfoldhq/trellis-core` owns reusable channel/thread state, event append, seq allocation, context/title projection, reducers, and task helpers. The CLI owns flags, terminal rendering, prompts, worker lifecycle, and process exits.
-
-## Reference Files
-
-- `references/workflows.md` — canonical collaboration patterns A–F (peer brainstorm, spawned review, dispatch-and-wait, forum issue capture, interrupt-and-redirect, one-shot run).
-- `references/forum.md` — forum channels, context, title, rename, changelog forums, thread filtering.
-- `references/workers.md` — spawn, agent cards, context injection (`--file` / `--jsonl`), interrupts, kill semantics.
-- `references/progress-debugging.md` — progress/raw inspection, stalled worker diagnosis, OOM guard, exit codes.
-- `references/command-reference.md` — current CLI command reference (every subcommand, every flag, output conventions, scope/type model).
-
-## Not For
-
-- One static review where a markdown file and prompt are enough.
-- Replacing normal tool calls with self-logging.
-- Long-term memory retrieval. Use durable forum channels for actionable issues, and `trellis mem` (the `trellis-session-insight` skill) for session/history search.
+1. **写作用域隔离**：禁止多个并行子代理同时修改同一个文件。
+2. **严禁套娃式递归派生**：严禁同角色无界限递归派生（例如审查代理又派审查代理），杜绝子代理过度扩张。
+3. **显式声明依赖**：不要把简单的父子任务结构当作隐式依赖，必须显式在步骤或依赖配置中指明先后顺序。
+4. **主代理把关全量质量门**：子代理完工后，主代理必须统一执行 `trellis-check` 验证最终集成结果。
