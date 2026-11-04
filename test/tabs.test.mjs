@@ -5,7 +5,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  activateTab,
   closeTab,
+  displayTitle,
+  renameTab,
+  shiftTab,
+  tabsLeftOf,
+  tabsRightOf,
   emptyLayout,
   ensureProject,
   moveTab,
@@ -202,4 +208,45 @@ test('a split survives a reload, and a v2 layout loads without one', () => {
   )
   assert.equal(projectState(v2, A).split, null)
   assert.equal(projectState(v2, A).tabs[0]?.pane, undefined)
+})
+
+test('a renamed tab keeps its name through reopen and reload', () => {
+  const A = 'proj-rename'
+  let layout = openTab(ensureProject(emptyLayout(), A), A, { kind: 'file', contentId: 'a.ts', title: 'a.ts' })
+  const id = tabId(A, 'file', 'a.ts')
+  layout = renameTab(layout, A, id, '  My name  ')
+  assert.equal(displayTitle(projectState(layout, A).tabs[0]), 'My name')
+  /* Reopening the same content must not clobber the user's name. */
+  layout = openTab(layout, A, { kind: 'file', contentId: 'a.ts', title: 'a.ts' })
+  assert.equal(displayTitle(projectState(layout, A).tabs[0]), 'My name')
+  assert.equal(projectState(parseLayout(serializeLayout(layout)), A).tabs[0].titleOverride, 'My name')
+  /* An empty name means "back to the default title". */
+  layout = renameTab(layout, A, id, '   ')
+  assert.equal(displayTitle(projectState(layout, A).tabs[0]), 'a.ts')
+  assert.equal(projectState(layout, A).tabs[0].titleOverride, undefined)
+})
+
+test('close-left / close-right scopes and keyboard reorder stay in bounds', () => {
+  const A = 'proj-scope'
+  let layout = ensureProject(emptyLayout(), A)
+  for (const name of ['a.ts', 'b.ts', 'c.ts']) layout = openTab(layout, A, { kind: 'file', contentId: name, title: name })
+  const [a, b, c] = ['a.ts', 'b.ts', 'c.ts'].map((name) => tabId(A, 'file', name))
+  assert.deepEqual(tabsLeftOf(layout, A, b), [a])
+  assert.deepEqual(tabsRightOf(layout, A, b), [c])
+  assert.deepEqual(tabsLeftOf(layout, A, a), [])
+  assert.deepEqual(tabsRightOf(layout, A, c), [])
+  assert.deepEqual(tabsLeftOf(layout, A, 'nope'), [])
+
+  /* Reorder by one slot, and refuse to walk off either end. */
+  layout = shiftTab(layout, A, b, -1)
+  assert.deepEqual(projectState(layout, A).tabs.map((tab) => tab.contentId), ['b.ts', 'a.ts', 'c.ts'])
+  layout = shiftTab(layout, A, b, -1)
+  assert.deepEqual(projectState(layout, A).tabs.map((tab) => tab.contentId), ['b.ts', 'a.ts', 'c.ts'])
+
+  /* Closing the active tab lands on the right neighbour, then on the left one. */
+  layout = activateTab(layout, A, a)
+  layout = closeTab(layout, A, a)
+  assert.equal(projectState(layout, A).activeTabId, c)
+  layout = closeTab(layout, A, c)
+  assert.equal(projectState(layout, A).activeTabId, b)
 })

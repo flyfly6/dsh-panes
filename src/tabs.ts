@@ -34,6 +34,12 @@ export interface TabModel {
   params?: Record<string, unknown>
   /** Absent means `primary` (the pane every pre-v0.3 layout had). */
   pane?: Pane
+  /**
+   * A name the user typed. `title` stays the computed default (file name, note
+   * title, …), so reopening the same content keeps the user's name instead of
+   * overwriting it — the reason this field exists at all.
+   */
+  titleOverride?: string
 }
 
 export interface ProjectTabs {
@@ -249,13 +255,48 @@ export function moveTab(layout: Layout, projectId: string, from: number, to: num
   return withProject(layout, projectId, { ...current, tabs })
 }
 
+/** What the tab strip shows: the user's name when there is one. */
+export function displayTitle(tab: TabModel): string {
+  return tab.titleOverride ?? tab.title
+}
+
+/**
+ * Rename a tab. An empty name means "back to the default", which is how the
+ * inline editor clears a rename (`Esc` cancels, empty `Enter` resets).
+ */
 export function renameTab(layout: Layout, projectId: string, id: string, title: string): Layout {
   const current = projectState(layout, projectId)
-  if (title.trim() === '') return layout
+  if (!current.tabs.some((tab) => tab.id === id)) return layout
+  const trimmed = title.trim()
   return withProject(layout, projectId, {
     ...current,
-    tabs: current.tabs.map((tab) => (tab.id === id ? { ...tab, title: title.trim() } : tab)),
+    tabs: current.tabs.map((tab) =>
+      tab.id === id ? { ...tab, titleOverride: trimmed === '' ? undefined : trimmed } : tab,
+    ),
   })
+}
+
+/** Ids left of (before) `id` in strip order, `id` excluded. */
+export function tabsLeftOf(layout: Layout, projectId: string, id: string): string[] {
+  const tabs = projectState(layout, projectId).tabs
+  const index = tabs.findIndex((tab) => tab.id === id)
+  return index < 0 ? [] : tabs.slice(0, index).map((tab) => tab.id)
+}
+
+/** Ids right of (after) `id` in strip order, `id` excluded. */
+export function tabsRightOf(layout: Layout, projectId: string, id: string): string[] {
+  const tabs = projectState(layout, projectId).tabs
+  const index = tabs.findIndex((tab) => tab.id === id)
+  return index < 0 ? [] : tabs.slice(index + 1).map((tab) => tab.id)
+}
+
+/** Nudge a tab one slot earlier or later (keyboard reorder, R4). */
+export function shiftTab(layout: Layout, projectId: string, id: string, delta: -1 | 1): Layout {
+  const tabs = projectState(layout, projectId).tabs
+  const from = tabs.findIndex((tab) => tab.id === id)
+  const to = from + delta
+  if (from < 0 || to < 0 || to >= tabs.length) return layout
+  return moveTab(layout, projectId, from, to)
 }
 
 /** Drops a project's tabs entirely (no migration) — used when a project vanishes. */
@@ -352,6 +393,7 @@ function parseTab(raw: unknown, projectId: string): TabModel[] {
           ? (entry.params as Record<string, unknown>)
           : undefined,
       pane: entry.pane === 'secondary' ? 'secondary' : undefined,
+      titleOverride: typeof entry.titleOverride === 'string' && entry.titleOverride.trim() !== '' ? entry.titleOverride : undefined,
     },
   ]
 }

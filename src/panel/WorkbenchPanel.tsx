@@ -19,9 +19,14 @@ import {
   activateTab,
   closeTab,
   ensureProject,
+  displayTitle,
   moveTab,
   openTab,
+  renameTab,
+  shiftTab,
   splitActive,
+  tabsLeftOf,
+  tabsRightOf,
   togglePane,
   unsplit,
   parseLayout,
@@ -399,19 +404,6 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
   )
 
   /** Closing a terminal tab ends its process (R1.13). */
-  const closeOne = React.useCallback(
-    (id: string) => {
-      if (activeProjectId === null) return
-      const tab = projectState(layout, activeProjectId).tabs.find((candidate) => candidate.id === id)
-      /* R3.7: an unsaved note asks before the tab (and its text) goes away. */
-      if (tab?.kind === 'note' && isNoteDirty(tab.contentId) && !window.confirm(t('notes.closeDirty'))) return
-      const sessionId = project?.sessionIds[0]
-      if (tab?.kind === 'terminal' && sessionId !== undefined) closeTerminalModel(`${sessionId}:${id}`)
-      setLayout((prev) => closeTab(prev, activeProjectId, id))
-    },
-    [activeProjectId, layout, project?.sessionIds, t],
-  )
-
   const selectTab = (id: string) => {
     if (activeProjectId === null) return
     setLayout((prev) => ({
@@ -419,6 +411,114 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
       projects: { ...prev.projects, [activeProjectId]: { ...projectState(prev, activeProjectId), activeTabId: id } },
     }))
   }
+
+  /* T5: rename, per-tab menu, drag hint, batch close, keyboard reorder. */
+  const [renaming, setRenaming] = React.useState<{ id: string; value: string } | null>(null)
+  const [menuFor, setMenuFor] = React.useState<string | null>(null)
+  const [menuAnchor, setMenuAnchor] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [dropHint, setDropHint] = React.useState<{ id: string; side: 'left' | 'right' } | null>(null)
+  const [toast, setToast] = React.useState('')
+  const stripRef = React.useRef<HTMLDivElement | null>(null)
+  const toastTimer = React.useRef<number | null>(null)
+
+  const notify = (message: string) => {
+    setToast(message)
+    if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToast(''), 1800)
+  }
+
+  const startRename = (tab: TabModel) => setRenaming({ id: tab.id, value: displayTitle(tab) })
+
+  const commitRename = (id: string, value: string) => {
+    if (activeProjectId !== null) setLayout((prev) => renameTab(prev, activeProjectId, id, value))
+    setRenaming(null)
+  }
+
+  const closeOne = React.useCallback(
+    (id: string, options?: { force?: boolean }) => {
+      if (activeProjectId === null) return
+      const tab = projectState(layout, activeProjectId).tabs.find((candidate) => candidate.id === id)
+      /* R3.7: an unsaved note asks before the tab (and its text) goes away. A
+         batch close already asked once for the whole group (`force`). */
+      if (
+        tab?.kind === 'note' &&
+        isNoteDirty(tab.contentId) &&
+        options?.force !== true &&
+        !window.confirm(t('notes.closeDirty'))
+      ) {
+        return
+      }
+      const sessionId = project?.sessionIds[0]
+      if (tab?.kind === 'terminal' && sessionId !== undefined) closeTerminalModel(`${sessionId}:${id}`)
+      setLayout((prev) => closeTab(prev, activeProjectId, id))
+    },
+    [activeProjectId, layout, project?.sessionIds, t],
+  )
+
+  /** One confirmation for the whole group, then close one by one (R3). */
+  const closeMany = (ids: string[]) => {
+    const targets = ids
+      .map((id) => state.tabs.find((tab) => tab.id === id))
+      .filter((tab): tab is TabModel => tab !== undefined)
+    if (targets.length === 0) return
+    if (targets.length > 1) {
+      const titles = targets.map((tab) => displayTitle(tab)).join('、')
+      const dirty = targets.filter((tab) => tab.kind === 'note' && isNoteDirty(tab.contentId)).length
+      const message = (
+        dirty > 0 ? t('tabs.closeManyDirty') : t('tabs.closeMany')
+      )
+        .replace('{count}', String(targets.length))
+        .replace('{dirty}', String(dirty))
+        .replace('{titles}', titles)
+      if (!window.confirm(message)) return
+    }
+    for (const tab of targets) closeOne(tab.id, { force: true })
+  }
+
+  const copyPath = async (tab: TabModel) => {
+    try {
+      await navigator.clipboard.writeText(tab.contentId)
+      notify(t('tabs.pathCopied'))
+    } catch {
+      notify(t('tabs.pathCopyFailed'))
+    }
+  }
+
+  /* ⌥⌘← / ⌥⌘→ reorder, ← / → move focus, F2 rename, Shift+F10 menu (R4/R5). */
+  const onStripKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (renaming !== null || activeProjectId === null) return
+    const tabs = state.tabs.filter((tab) => tab.pane !== 'secondary')
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      const step = event.key === 'ArrowLeft' ? -1 : 1
+      if ((event.altKey && (event.metaKey || event.ctrlKey)) && state.activeTabId !== null) {
+        event.preventDefault()
+        setLayout((prev) => shiftTab(prev, activeProjectId, state.activeTabId!, step === -1 ? -1 : 1))
+        return
+      }
+      if (event.altKey || event.metaKey || event.ctrlKey) return
+      event.preventDefault()
+      const index = tabs.findIndex((tab) => tab.id === state.activeTabId)
+      const next = tabs[Math.min(tabs.length - 1, Math.max(0, index + step))]
+      if (next !== undefined) {
+        selectTab(next.id)
+        stripRef.current?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(next.id)}"]`)?.focus()
+      }
+      return
+    }
+    if (event.key === 'F2' && state.activeTabId !== null) {
+      event.preventDefault()
+      const tab = tabs.find((candidate) => candidate.id === state.activeTabId)
+      if (tab !== undefined) startRename(tab)
+      return
+    }
+    if (event.key === 'F10' && event.shiftKey && state.activeTabId !== null) {
+      event.preventDefault()
+      const rect = stripRef.current?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(state.activeTabId)}"]`)?.getBoundingClientRect()
+      setMenuAnchor({ x: rect?.left ?? 0, y: rect?.bottom ?? 0 })
+      setMenuFor(state.activeTabId)
+    }
+  }
+
 
   const cycleTab = (delta: number) => {
     if (activeProjectId === null || state.tabs.length < 2) return
@@ -728,21 +828,43 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
 
   const tabStrip = (
     <div className="flex h-tab shrink-0 items-stretch border-b border-border bg-[var(--tabstrip-bg)]" role="tablist">
-      <div className="wb-scroll flex min-w-0 flex-1 items-stretch overflow-x-auto">
+      <div ref={stripRef} onKeyDown={onStripKeyDown} className="wb-scroll flex min-w-0 flex-1 items-stretch overflow-x-auto">
         {state.tabs.filter((tab) => tab.pane !== 'secondary').map((tab) => {
           const active = tab.id === state.activeTabId
           const icon = registry.get(tab.kind)?.icon
+          const left = activeProjectId === null ? [] : tabsLeftOf(layout, activeProjectId, tab.id)
+          const right = activeProjectId === null ? [] : tabsRightOf(layout, activeProjectId, tab.id)
+          const pathLike = tab.kind === 'file' || tab.kind === 'note' || tab.kind === 'explorer'
           return (
             <div
               key={tab.id}
               role="tab"
               aria-selected={active}
-              tabIndex={0}
-              draggable
+              data-tab-id={tab.id}
+              tabIndex={active ? 0 : -1}
+              draggable={renaming?.id !== tab.id}
+              onContextMenu={(event) => {
+                event.preventDefault()
+                setMenuAnchor({ x: event.clientX, y: event.clientY })
+                setMenuFor(tab.id)
+              }}
+              onDoubleClick={() => startRename(tab)}
               onDragStart={() => (dragIndex.current = state.tabs.findIndex((candidate) => candidate.id === tab.id))}
-              onDragOver={(event) => event.preventDefault()}
+              onDragOver={(event) => {
+                event.preventDefault()
+                const rect = event.currentTarget.getBoundingClientRect()
+                setDropHint({ id: tab.id, side: event.clientX < rect.left + rect.width / 2 ? 'left' : 'right' })
+                const strip = stripRef.current
+                if (strip !== null) {
+                  const box = strip.getBoundingClientRect()
+                  if (event.clientX - box.left < 24) strip.scrollLeft -= 12
+                  else if (box.right - event.clientX < 24) strip.scrollLeft += 12
+                }
+              }}
+              onDragEnd={() => setDropHint(null)}
               onDrop={(event) => {
                 event.preventDefault()
+                setDropHint(null)
                 if (dragIndex.current !== null && activeProjectId !== null) {
                   const from = dragIndex.current
                   setLayout((prev) => moveTab(prev, activeProjectId, from, state.tabs.findIndex((candidate) => candidate.id === tab.id)))
@@ -750,7 +872,9 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
                 dragIndex.current = null
               }}
               onClick={() => selectTab(tab.id)}
-              onKeyDown={(event) => event.key === 'Enter' && selectTab(tab.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') selectTab(tab.id)
+              }}
               onAuxClick={(event) => {
                 if (event.button === 1) closeOne(tab.id)
               }}
@@ -762,7 +886,32 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
               )}
             >
               {icon ?? <KindIcon kind={tab.kind} />}
-              <span className="truncate">{tab.title}</span>
+              {renaming !== null && renaming.id === tab.id ? (
+                <input
+                  aria-label={t('tabs.renameLabel')}
+                  autoFocus
+                  value={renaming.value}
+                  className="w-full min-w-0 rounded-sm bg-[var(--background)] px-0.5 text-xs text-foreground outline-none ring-1 ring-primary"
+                  onChange={(event) => setRenaming({ id: tab.id, value: event.target.value })}
+                  onFocus={(event) => event.target.select()}
+                  onClick={(event) => event.stopPropagation()}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                  onBlur={() => commitRename(tab.id, renaming.value)}
+                  onKeyDown={(event) => {
+                    /* The panel's own shortcuts must not fire while typing (R7). */
+                    event.stopPropagation()
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      commitRename(tab.id, renaming.value)
+                    } else if (event.key === 'Escape') {
+                      event.preventDefault()
+                      setRenaming(null)
+                    }
+                  }}
+                />
+              ) : (
+                <span className="truncate">{displayTitle(tab)}</span>
+              )}
               {tab.kind === 'git' && git !== null && git.changes > 0 && (
                 <span className="wb-badge rounded-full px-1 text-2xs leading-4">{git.changes}</span>
               )}
@@ -780,6 +929,64 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
               >
                 <X className="h-2.5 w-2.5" aria-hidden />
               </button>
+              {dropHint?.id === tab.id && (
+                <span
+                  aria-hidden
+                  className={cn('pointer-events-none absolute top-0 h-full w-0.5 bg-primary', dropHint.side === 'left' ? 'left-0' : 'right-0')}
+                />
+              )}
+              {menuFor === tab.id && (
+                <DropdownMenu open onOpenChange={(open) => (open ? undefined : setMenuFor(null))}>
+                  <DropdownMenuTrigger asChild>
+                    <span aria-hidden className="pointer-events-none fixed h-0 w-0" style={{ left: menuAnchor.x, top: menuAnchor.y }} />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[220px]">
+                    <DropdownMenuItem onSelect={() => startRename(tab)}>{t('tabs.rename')}</DropdownMenuItem>
+                    {tab.titleOverride !== undefined && (
+                      <DropdownMenuItem onSelect={() => activeProjectId !== null && commitRename(tab.id, '')}>
+                        {t('tabs.renameReset')}
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => closeOne(tab.id)}>{t('tabs.closeOne')}</DropdownMenuItem>
+                    <DropdownMenuItem disabled={state.tabs.length < 2} onSelect={() => closeMany(state.tabs.filter((item) => item.id !== tab.id).map((item) => item.id))}>
+                      {t('tabs.closeOthers')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={left.length === 0}
+                      onSelect={() => closeMany(left)}
+                    >
+                      {left.length > 1 ? t('tabs.closeLeftN').replace('{count}', String(left.length)) : t('tabs.closeLeft')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={right.length === 0}
+                      onSelect={() => closeMany(right)}
+                    >
+                      {right.length > 1 ? t('tabs.closeRightN').replace('{count}', String(right.length)) : t('tabs.closeRight')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => closeMany(state.tabs.map((item) => item.id))}>{t('tabs.closeAll')}</DropdownMenuItem>
+                    {pathLike && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => void copyPath(tab)}>{t('tabs.copyPath')}</DropdownMenuItem>
+                        {tab.kind === 'file' && project !== undefined && (
+                          <DropdownMenuItem
+                            onSelect={() =>
+                              void call('path.reveal', { path: `${project.path}/${tab.contentId}` }).catch(() => undefined)
+                            }
+                          >
+                            {t('tabs.reveal')}
+                          </DropdownMenuItem>
+                        )}
+                      </>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => activeProjectId !== null && setLayout((prev) => reopenLast(prev, activeProjectId))}>
+                      {t('tabs.reopen')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           )
         })}
@@ -867,32 +1074,12 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onSelect={() =>
-                activeProjectId !== null &&
-                activeTab !== undefined &&
-                setLayout((prev) => {
-                  let next = prev
-                  for (const tab of projectState(prev, activeProjectId).tabs) {
-                    if (tab.id !== activeTab.id) next = closeTab(next, activeProjectId, tab.id)
-                  }
-                  return next
-                })
-              }
+              disabled={state.tabs.length < 2}
+              onSelect={() => closeMany(state.tabs.filter((tab) => tab.id !== activeTab?.id).map((tab) => tab.id))}
             >
               {t('tabs.closeOthers')}
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() =>
-                activeProjectId !== null &&
-                setLayout((prev) => {
-                  let next = prev
-                  for (const tab of projectState(prev, activeProjectId).tabs) next = closeTab(next, activeProjectId, tab.id)
-                  return next
-                })
-              }
-            >
-              {t('tabs.closeAll')}
-            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => closeMany(state.tabs.map((tab) => tab.id))}>{t('tabs.closeAll')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -900,7 +1087,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
   )
 
   const fileSegments = activeTab?.kind === 'file' ? activeTab.contentId.split('/') : []
-  const noteSegments = activeTab?.kind === 'note' ? [`~/.dsh/notes`, activeTab.title] : []
+  const noteSegments = activeTab?.kind === 'note' ? [`~/.dsh/notes`, displayTitle(activeTab)] : []
   const segments = fileSegments.length > 0 ? fileSegments : noteSegments
   const crumbMeta =
     activeTab === undefined
@@ -921,7 +1108,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
       {segments.length === 0 ? (
         <span className="flex items-center gap-1.5">
           <Folder className="h-3 w-3" aria-hidden />
-          {activeTab === undefined ? t('panel.title') : activeTab.title}
+          {activeTab === undefined ? t('panel.title') : displayTitle(activeTab)}
         </span>
       ) : (
         <span className="flex min-w-0 items-center gap-1">
@@ -1134,7 +1321,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
                 )}
               >
                 <KindIcon kind={tab.kind} />
-                <span className="truncate">{tab.title}</span>
+                <span className="truncate">{displayTitle(tab)}</span>
                 <button
                   type="button"
                   aria-label={t('tabs.close')}
@@ -1172,6 +1359,14 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
           onOpen={(path) => openFile(path)}
           onClose={() => setQuickOpen(false)}
         />
+      )}
+      {toast !== '' && (
+        <div
+          role="status"
+          className="pointer-events-none fixed bottom-9 left-1/2 z-50 -translate-x-1/2 rounded-md bg-[var(--card)] px-2.5 py-1 text-xs text-foreground shadow-[0_4px_16px_rgba(0,0,0,0.18)] ring-1 ring-border"
+        >
+          {toast}
+        </div>
       )}
       {sidebar}
       <div className="flex min-w-0 flex-1 flex-col">
