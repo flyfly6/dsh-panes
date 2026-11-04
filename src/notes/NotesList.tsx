@@ -1,6 +1,7 @@
 /**
- * The notes list: one row per `.md` in the vault, a search box over titles and
- * bodies, and the verbs that own the file (new, rename, delete).
+ * The notes list: one row per `.md` in *this project's* vault folder, a search box
+ * over titles and bodies, and the verbs that own the file (new, rename, move,
+ * reveal, delete).
  */
 import * as React from 'react'
 import { FileText, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react'
@@ -10,6 +11,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu'
 import { Input } from '../ui/input'
@@ -33,7 +35,19 @@ interface Hit {
 
 type Sort = 'updated' | 'title'
 
-export function NotesList({ t, open }: { t: Translate; open: (path: string) => void }) {
+export function NotesList({
+  t,
+  projectPath,
+  projects,
+  open,
+}: {
+  t: Translate
+  /** The active project's folder — the list shows this project's notes only. */
+  projectPath: string
+  /** Move targets: every project, plus the shared inbox (`path: ''`). */
+  projects: { path: string; title: string }[]
+  open: (path: string, title: string) => void
+}) {
   const [notes, setNotes] = React.useState<NoteEntry[]>([])
   const [vaultPath, setVaultPath] = React.useState('')
   const [query, setQuery] = React.useState('')
@@ -43,14 +57,14 @@ export function NotesList({ t, open }: { t: Translate; open: (path: string) => v
   const [busy, setBusy] = React.useState(false)
 
   const load = React.useCallback(() => {
-    call<{ vaultPath: string; notes: NoteEntry[] }>('notes.list')
+    call<{ vaultPath: string; notes: NoteEntry[] }>('notes.list', { projectPath })
       .then((data) => {
         setNotes(data.notes)
         setVaultPath(data.vaultPath)
         setError('')
       })
       .catch((failure: Error) => setError(failure.message))
-  }, [])
+  }, [projectPath])
 
   React.useEffect(() => {
     load()
@@ -62,19 +76,22 @@ export function NotesList({ t, open }: { t: Translate; open: (path: string) => v
       return undefined
     }
     const timer = window.setTimeout(() => {
-      call<{ hits: Hit[] }>('notes.search', { query })
+      call<{ hits: Hit[] }>('notes.search', { query, projectPath })
         .then((data) => setHits(data.hits))
         .catch(() => setHits([]))
     }, 180)
     return () => window.clearTimeout(timer)
-  }, [query])
+  }, [query, projectPath])
 
   const create = async () => {
     setBusy(true)
     try {
-      const created = await call<{ path: string }>('notes.create', { title: t('notes.untitledNew') })
+      const created = await call<{ path: string; title: string }>('notes.create', {
+        title: t('notes.untitledNew'),
+        projectPath,
+      })
       load()
-      open(created.path)
+      open(created.path, created.title)
     } catch (failure) {
       setError((failure as Error).message)
     } finally {
@@ -86,9 +103,21 @@ export function NotesList({ t, open }: { t: Translate; open: (path: string) => v
     const title = window.prompt(t('notes.renamePrompt'), note.title)
     if (title === null || title.trim() === '') return
     try {
-      const renamed = await call<{ path: string }>('notes.rename', { path: note.path, title: title.trim() })
+      const renamed = await call<{ path: string; title: string }>('notes.rename', { path: note.path, title: title.trim() })
       load()
-      if (note.path !== renamed.path) open(renamed.path)
+      if (note.path !== renamed.path) open(renamed.path, renamed.title)
+    } catch (failure) {
+      setError((failure as Error).message)
+    }
+  }
+
+  /* Moving rewrites the vault path, so an open tab of that note goes stale; the
+     list reopens the new path only when the move landed in this project. */
+  const move = async (note: NoteEntry, target: string) => {
+    try {
+      const moved = await call<{ path: string; moved: boolean }>('notes.move', { path: note.path, projectPath: target })
+      load()
+      if (moved.moved && target === projectPath) open(moved.path, note.title)
     } catch (failure) {
       setError((failure as Error).message)
     }
@@ -99,6 +128,15 @@ export function NotesList({ t, open }: { t: Translate; open: (path: string) => v
     try {
       await call('notes.delete', { path: note.path })
       load()
+    } catch (failure) {
+      setError((failure as Error).message)
+    }
+  }
+
+  /** Reveal in Finder / Explorer — the vault lives outside every workspace. */
+  const reveal = async (note: NoteEntry) => {
+    try {
+      await call('path.reveal', { path: `${vaultPath}/${note.path}` })
     } catch (failure) {
       setError((failure as Error).message)
     }
@@ -144,7 +182,7 @@ export function NotesList({ t, open }: { t: Translate; open: (path: string) => v
         >
           {sort === 'updated' ? t('notes.sort.updated') : t('notes.sort.title')}
         </Button>
-        <span className="shrink-0 text-[10px] text-muted-foreground" title={vaultPath}>
+        <span className="shrink-0 text-2xs text-muted-foreground" title={vaultPath}>
           {t('notes.count').replace('{n}', String(notes.length))}
         </span>
         <Button size="sm" variant="outline" disabled={busy} onClick={() => void create()}>
@@ -165,7 +203,7 @@ export function NotesList({ t, open }: { t: Translate; open: (path: string) => v
               className="group flex items-start gap-2 border-b border-border px-3 py-2 hover:bg-accent"
             >
               <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-              <button type="button" className="min-w-0 flex-1 text-left" onClick={() => open(note.path)}>
+              <button type="button" className="min-w-0 flex-1 text-left" onClick={() => open(note.path, note.title)}>
                 <div className="truncate text-xs text-foreground">{note.title}</div>
                 <div className="truncate text-2xs text-muted-foreground">{note.excerpt === '' ? note.path : note.excerpt}</div>
               </button>
@@ -178,6 +216,17 @@ export function NotesList({ t, open }: { t: Translate; open: (path: string) => v
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onSelect={() => void rename(note)}>{t('notes.rename')}</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void reveal(note)}>{t('notes.reveal')}</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem disabled className="text-faint">{t('notes.moveTo')}</DropdownMenuItem>
+                  {projects
+                    .filter((item) => item.path !== projectPath)
+                    .map((item) => (
+                      <DropdownMenuItem key={item.path} onSelect={() => void move(note, item.path)}>
+                        {item.title}
+                      </DropdownMenuItem>
+                    ))}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => void remove(note)}>
                     <span className="flex items-center gap-2">
                       <Trash2 className="h-3 w-3" aria-hidden /> {t('notes.delete')}

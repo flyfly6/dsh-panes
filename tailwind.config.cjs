@@ -26,12 +26,14 @@ module.exports = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
-      // IDE density, not marketing density (§2.0d-1).
+      // IDE density, not marketing density (§2.0d-1). Every step derives from
+      // `--wb-font-ui-size` (tailwind.css), so the `fontUiSize` config field
+      // scales the whole panel instead of only unclassed text.
       fontSize: {
-        '2xs': ['10px', '14px'],
-        xs: ['11px', '16px'],
-        sm: ['12px', '18px'],
-        base: ['13px', '20px'],
+        '2xs': ['var(--wb-text-2xs)', 'var(--wb-lh-2xs)'],
+        xs: ['var(--wb-text-xs)', 'var(--wb-lh-xs)'],
+        sm: ['var(--wb-text-sm)', 'var(--wb-lh-sm)'],
+        base: ['var(--wb-text-base)', 'var(--wb-lh-base)'],
       },
       spacing: { tab: '42px', crumb: '30px', status: '26px', rail: '52px' },
     },

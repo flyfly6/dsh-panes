@@ -224,7 +224,7 @@ export function FileView({ path, sessionId, remote, t, line, stamp, onCursor }: 
           </div>
         )}
       </div>
-      <div className="flex h-status shrink-0 items-center gap-2 border-t border-border bg-[var(--card)] px-2 text-[10px] text-muted-foreground">
+      <div className="flex h-status shrink-0 items-center gap-2 border-t border-border bg-[var(--card)] px-2 text-2xs text-muted-foreground">
         <span>{languageLabel(path)}</span>
         <span>{state.count}</span>
         <span className="ml-auto" />

@@ -60,6 +60,11 @@ Order inside a file:
 - **Tailwind utilities with the theme tokens only.** `bg-card`, `text-muted-foreground`,
   `border-border`, `h-status`, `text-2xs` — all defined in `tailwind.config.cjs`
   against the host's CSS variables.
+- **Text sizes are one ladder, and the ladder is variable-driven** (v0.3): the four
+  steps `2xs / xs / sm / base` are `calc()`-derived from `--wb-font-ui-size` in
+  `src/styles/tailwind.css`, and the row config's `fontUiSize` overrides that root
+  variable. Use a step, never `text-[13px]` — an arbitrary px size opts the node out
+  of the user's font-size setting.
 - **Preflight is off** and every component renders under `.workbench-root` /
   `.workbench-portal`, so the panel cannot restyle the host. Do not add global
   selectors, `body {…}`, or unprefixed element styles to `src/styles/tailwind.css`.

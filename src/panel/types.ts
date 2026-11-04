@@ -72,4 +72,6 @@ export interface PanelProps {
   /** Collapse / restore dsh's own sidebar around the panel (R1.1). */
   collapseHostSidebar?: () => void
   restoreHostSidebar?: () => void
+  /** Flip the host theme preference (absent = host exposes no theme service). */
+  toggleTheme?: () => void
 }

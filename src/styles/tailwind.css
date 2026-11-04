@@ -35,7 +35,18 @@
      Settings override these through the same variables. */
   --wb-font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', sans-serif;
   --wb-font-code: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --wb-font-ui-size: 12px;
+  /* One knob (`fontUiSize`) drives every text step, so raising it scales the
+     panel instead of only the unclassed text. Steps keep the old 14/16/18/20
+     line-height feel at the default 13px. */
+  --wb-font-ui-size: 13px;
+  --wb-text-2xs: calc(var(--wb-font-ui-size) - 2px);
+  --wb-text-xs: calc(var(--wb-font-ui-size) - 1px);
+  --wb-text-sm: var(--wb-font-ui-size);
+  --wb-text-base: calc(var(--wb-font-ui-size) + 1px);
+  --wb-lh-2xs: calc(var(--wb-text-2xs) + 4px);
+  --wb-lh-xs: calc(var(--wb-text-xs) + 5px);
+  --wb-lh-sm: calc(var(--wb-text-sm) + 6px);
+  --wb-lh-base: calc(var(--wb-text-base) + 7px);
   --wb-font-code-size: 12px;
   --wb-code-line-height: 22px;
 }

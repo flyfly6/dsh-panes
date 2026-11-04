@@ -26,12 +26,6 @@ const NoteEditorLazy = React.lazy(async () => {
 const PLUGIN_ID = 'dsh-panes'
 const PANEL_KEY = 'workbench'
 
-/** `dir/some-note.md` -> `some-note`, the tab label before the note loads a title. */
-function noteTitle(path: string): string {
-  const name = path.split('/').pop() ?? path
-  return name.replace(/\.md$/i, '')
-}
-
 export const name = PLUGIN_ID
 export const inject = ['slots', 'layout', 'locale', 'workspaces', 'sessions', 'webTerminals', 'remote', 'remote.workspaceFiles'] as const
 
@@ -123,6 +117,25 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
     await add.call(service, path)
   }
   /**
+   * Status-bar appearance toggle. The host owns the preference — `setTheme` is
+   * its only write entry (`light` / `dark` / `system`) — so there is no local
+   * persistence here. With `system` active we flip away from what is resolved now.
+   */
+  const toggleTheme = (): void => {
+    let theme: { getTheme?: () => { active?: { colorScheme?: string } }; setTheme?: (id: string) => void } | undefined
+    try {
+      theme = (ctx.get?.('theme') ?? ctx.theme) as typeof theme
+    } catch {
+      theme = undefined
+    }
+    if (theme?.getTheme === undefined || theme.setTheme === undefined) return
+    try {
+      theme.setTheme(theme.getTheme().active?.colorScheme === 'dark' ? 'light' : 'dark')
+    } catch {
+      /* the write was refused: the label stays where it was */
+    }
+  }
+  /**
    * R1.1: entering the workbench collapses dsh's own sidebar (otherwise the user
    * looks at two left rails), and leaving restores it. The action lives on
    * `ctx.layout.panels` (`toggleSidebar`), not on `ctx.layout` — S10 was wrong
@@ -180,22 +193,27 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
     })
   }, 'dsh-panes: git tab')
 
-  // T3: the notes vault is global (it lives outside every workspace), so both
-  // tabs take no project path at all.
+  // T3: the vault lives outside every workspace, but each project has its own
+  // folder inside it (v0.3), so the list is scoped by the tab's project.
   ctx.effect(() => {
     const offList = registry.register({
       kind: 'notes',
       order: 50,
-      render: ({ open, t }) => (
-        <NotesList t={t} open={(path) => open({ kind: 'note', contentId: path, title: noteTitle(path) })} />
+      render: ({ open, t, project, projects }) => (
+        <NotesList
+          t={t}
+          projectPath={project?.path ?? ''}
+          projects={[{ path: '', title: t('notes.inbox') }, ...projects]}
+          open={(path, title) => open({ kind: 'note', contentId: path, title })}
+        />
       ),
     })
     const offNote = registry.register({
       kind: 'note',
       order: 51,
-      render: ({ tab, t }) => (
+      render: ({ tab, t, retitle }) => (
         <React.Suspense fallback={<div className="p-4 text-xs text-muted-foreground">{t('notes.loading')}</div>}>
-          <NoteEditorLazy path={tab.contentId} t={t} />
+          <NoteEditorLazy path={tab.contentId} t={t} onTitle={retitle} />
         </React.Suspense>
       ),
     })
@@ -240,6 +258,7 @@ export function apply(ctx: any, config: Record<string, unknown> = {}): void {
               /* Read per render: the settings card writes the same volatile refs. */
               appearance: () => appearanceOf(config),
               addProject,
+              toggleTheme,
               collapseHostSidebar,
               restoreHostSidebar,
             }),

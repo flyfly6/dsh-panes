@@ -1,6 +1,6 @@
 /**
- * The notes vault: creation, listing, atomic writes with etag conflicts,
- * frontmatter preservation, rename/delete and the path fence.
+ * The notes vault: per-project folders, creation, listing, atomic writes with
+ * etag conflicts, frontmatter preservation, rename/move/delete and the path fence.
  */
 import { after, test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -30,7 +30,7 @@ test('the first call creates the vault, and a fresh one lists nothing', async ()
 
 test('create writes a slugged file with frontmatter and a heading', async () => {
   const created = await call('notes.create', { title: 'My First Note' })
-  assert.equal(created.path, 'my-first-note.md')
+  assert.equal(created.path, '_inbox/my-first-note.md')
   const text = readFileSync(path.join(vault, created.path), 'utf8')
   assert.match(text, /^---\ntitle: My First Note\ncreated: /)
   /* The editor shows the title in its own input; the file carries no heading. */
@@ -48,7 +48,7 @@ test('create requires a title, and the body starts empty (the editor owns the ti
 
 test('a second note with the same title gets a numeric suffix', async () => {
   const again = await call('notes.create', { title: 'My First Note' })
-  assert.equal(again.path, 'my-first-note-2.md')
+  assert.equal(again.path, '_inbox/my-first-note-2.md')
 })
 
 test('write keeps unknown frontmatter fields and appends updated', async () => {
@@ -84,10 +84,23 @@ test('a stale etag is a conflict, not an overwrite', async () => {
 test('rename moves the file and retitles the frontmatter', async () => {
   const created = await call('notes.create', { title: 'Old Title' })
   const renamed = await call('notes.rename', { path: created.path, title: 'New Title' })
-  assert.equal(renamed.path, 'new-title.md')
+  assert.equal(renamed.path, '_inbox/new-title.md')
   const text = readFileSync(path.join(vault, renamed.path), 'utf8')
   assert.match(text, /title: New Title/)
   assert.throws(() => readFileSync(path.join(vault, created.path), 'utf8'))
+})
+
+test('notes are scoped to one project folder and can move between projects', async () => {
+  const a = await call('notes.create', { title: 'Project A note', projectPath: '/tmp/proj-a' })
+  const b = await call('notes.create', { title: 'Project B note', projectPath: '/tmp/proj-b' })
+  assert.notEqual(path.posix.dirname(a.path), path.posix.dirname(b.path))
+  assert.deepEqual((await call('notes.list', { projectPath: '/tmp/proj-a' })).notes.map((note) => note.path), [a.path])
+  /* One project's search never sees another project's note. */
+  assert.equal((await call('notes.search', { query: 'project b', projectPath: '/tmp/proj-a' })).hits.length, 0)
+  const moved = await call('notes.move', { path: a.path, projectPath: '/tmp/proj-b' })
+  assert.equal(moved.moved, true)
+  assert.equal(path.posix.dirname(moved.path), path.posix.dirname(b.path))
+  assert.deepEqual((await call('notes.list', { projectPath: '/tmp/proj-a' })).notes, [])
 })
 
 test('delete moves the note into .trash and out of the list', async () => {

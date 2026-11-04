@@ -153,7 +153,7 @@ export function SearchView({ root, sessionId, remote, onOpen, t, autoFocus }: Pr
             }
           }}
         />
-        <span className="shrink-0 text-[10px] text-muted-foreground">
+        <span className="shrink-0 text-2xs text-muted-foreground">
           {result === null
             ? ''
             : t('search.summary')
@@ -169,7 +169,7 @@ export function SearchView({ root, sessionId, remote, onOpen, t, autoFocus }: Pr
             setCaseSensitive(next)
             run(query, { regex, caseSensitive: next, globs })
           }}
-          className={cn('grid h-[22px] w-[26px] place-items-center rounded border text-[11px]', caseSensitive ? 'border-border bg-accent text-foreground' : 'border-transparent text-muted-foreground')}
+          className={cn('grid h-[22px] w-[26px] place-items-center rounded border text-xs', caseSensitive ? 'border-border bg-accent text-foreground' : 'border-transparent text-muted-foreground')}
         >
           Aa
         </button>
@@ -182,13 +182,13 @@ export function SearchView({ root, sessionId, remote, onOpen, t, autoFocus }: Pr
             setRegex(next)
             run(query, { regex: next, caseSensitive, globs })
           }}
-          className={cn('grid h-[22px] w-[26px] place-items-center rounded border text-[11px]', regex ? 'border-border bg-accent text-foreground' : 'border-transparent text-muted-foreground')}
+          className={cn('grid h-[22px] w-[26px] place-items-center rounded border text-xs', regex ? 'border-border bg-accent text-foreground' : 'border-transparent text-muted-foreground')}
         >
           .*
         </button>
-        <span className="flex h-[22px] shrink-0 items-center gap-1 rounded border border-border px-1.5 text-[10px] text-muted-foreground">
+        <span className="flex h-[22px] shrink-0 items-center gap-1 rounded border border-border px-1.5 text-2xs text-muted-foreground">
           <input
-            className="w-[64px] border-0 bg-transparent text-[10px] text-foreground outline-none placeholder:text-muted-foreground"
+            className="w-[64px] border-0 bg-transparent text-2xs text-foreground outline-none placeholder:text-muted-foreground"
             placeholder="src/**"
             value={globs}
             onChange={(event) => setGlobs(event.target.value)}
@@ -218,7 +218,7 @@ export function SearchView({ root, sessionId, remote, onOpen, t, autoFocus }: Pr
 
       <div className="flex min-h-0 flex-1">
         <div className="flex w-[46%] min-w-[280px] flex-col border-r border-border">
-          <div className="flex h-[26px] shrink-0 items-center gap-2 border-b border-border px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <div className="flex h-[26px] shrink-0 items-center gap-2 border-b border-border px-3 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             {t('search.results')}
             {busy && <Loader2 className="h-2.5 w-2.5 animate-spin" aria-hidden />}
             {result?.truncated === true && <span className="ml-auto normal-case tracking-normal">{t('search.truncated')}</span>}
@@ -242,8 +242,8 @@ export function SearchView({ root, sessionId, remote, onOpen, t, autoFocus }: Pr
                     {isCollapsed ? <ChevronRight className="h-3 w-3 text-muted-foreground" aria-hidden /> : <ChevronDown className="h-3 w-3 text-muted-foreground" aria-hidden />}
                     <FileText className="h-3 w-3 text-[#3B6FF5]" aria-hidden />
                     <span className="truncate text-[11.5px] font-medium text-foreground">{name}</span>
-                    <span className="truncate text-[10px] text-muted-foreground">{dir}</span>
-                    <span className="ml-auto text-[10px] text-muted-foreground">{hits.length}</span>
+                    <span className="truncate text-2xs text-muted-foreground">{dir}</span>
+                    <span className="ml-auto text-2xs text-muted-foreground">{hits.length}</span>
                   </button>
                   {!isCollapsed &&
                     hits.map((hit, index) => (
@@ -257,8 +257,8 @@ export function SearchView({ root, sessionId, remote, onOpen, t, autoFocus }: Pr
                         onClick={() => showHit(hit, index)}
                         onDoubleClick={() => onOpen(hit.path, hit.line)}
                       >
-                        <span className="w-6 shrink-0 text-right text-[10px] text-muted-foreground">{hit.line}</span>
-                        <span className="truncate font-mono text-[11px]">
+                        <span className="w-6 shrink-0 text-right text-2xs text-muted-foreground">{hit.line}</span>
+                        <span className="truncate font-mono text-xs">
                           <Marked text={hit.text} query={regex ? '' : query} />
                         </span>
                       </button>
@@ -270,7 +270,7 @@ export function SearchView({ root, sessionId, remote, onOpen, t, autoFocus }: Pr
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-crumb shrink-0 items-center gap-1 overflow-hidden border-b border-border px-3 text-[11px] text-muted-foreground">
+          <div className="flex h-crumb shrink-0 items-center gap-1 overflow-hidden border-b border-border px-3 text-xs text-muted-foreground">
             {segments.length === 0 ? (
               <span>{t('search.noPreview')}</span>
             ) : (
@@ -281,7 +281,7 @@ export function SearchView({ root, sessionId, remote, onOpen, t, autoFocus }: Pr
                     <span className={cn('truncate', index === segments.length - 1 && 'text-foreground')}>{segment}</span>
                   </React.Fragment>
                 ))}
-                <span className="ml-auto shrink-0 text-[10px]">{preview?.badge ?? ''}</span>
+                <span className="ml-auto shrink-0 text-2xs">{preview?.badge ?? ''}</span>
               </>
             )}
           </div>

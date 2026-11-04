@@ -1,6 +1,7 @@
 /**
- * The notes vault: one `.md` per note under a configurable root, shared by every
- * workspace.
+ * The notes vault: one `.md` per note under a configurable root, grouped into one
+ * folder per project (`<vault>/<project>-<hash>/`) plus `_inbox` for notes that
+ * belong to no project (and for every note written before v0.3).
  *
  * The editor never sees frontmatter. The client edits the *body*; this half keeps
  * the `---` block intact (unknown fields and their order survive), stamps
@@ -47,6 +48,8 @@ export interface NoteEntry {
 
 const MD = '.md'
 const TRASH = '.trash'
+/** Notes that belong to no project (and the home of pre-v0.3 flat notes). */
+const INBOX = '_inbox'
 const MAX_BODY = 4 * 1024 * 1024
 const SEARCH_LIMIT = 200
 
@@ -254,6 +257,40 @@ function hash(text: string): string {
   return createHash('sha1').update(text).digest('hex').slice(0, 12)
 }
 
+/**
+ * One folder per project: readable (`my-app-4f2a91`) and unique even when two
+ * projects share a basename — the hash is over the absolute path.
+ */
+export function projectFolderKey(projectPath: string): string {
+  const spelled = String(projectPath ?? '').trim()
+  if (spelled === '') return INBOX
+  const base = spelled.replace(/\\/g, '/').replace(/\/+$/, '')
+  return `${slugify(path.posix.basename(base))}-${hash(spelled).slice(0, 6)}`
+}
+
+/** Flat v0.2 notes move into `_inbox` once per process, so nothing disappears. */
+let legacyChecked = false
+async function migrateLegacy(base: string): Promise<void> {
+  if (legacyChecked) return
+  legacyChecked = true
+  const entries = await readdir(base, { withFileTypes: true }).catch(() => [])
+  const flat = entries.filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(MD))
+  if (flat.length === 0) return
+  await mkdir(path.join(base, INBOX), { recursive: true })
+  for (const entry of flat) {
+    const target = await uniqueRel(base, `${INBOX}/${slugify(path.basename(entry.name, MD))}`)
+    await rename(path.join(base, entry.name), path.join(base, target)).catch(() => undefined)
+  }
+}
+
+/** The folder one project's notes live in, created on demand. */
+async function projectFolder(base: string, projectPath: string): Promise<{ dir: string; rel: string }> {
+  await migrateLegacy(base)
+  const rel = projectFolderKey(projectPath)
+  await mkdir(path.join(base, rel), { recursive: true })
+  return { dir: path.join(base, rel), rel }
+}
+
 /* ---------------------------------- the ops --------------------------------- */
 
 export type NotesOps = Record<string, (args: Record<string, unknown>) => Promise<unknown>>
@@ -272,11 +309,13 @@ export function createNotesOps(readConfig: () => Record<string, unknown>): Notes
       return { vaultPath: root, configured: configured === undefined || configured === '' ? null : String(configured), defaultPath: defaultVaultPath() }
     },
 
-    'notes.list': async () => {
+    'notes.list': async (args) => {
       const base = await root()
-      const files = await walk(base)
+      const folder = await projectFolder(base, String(args.projectPath ?? ''))
+      const files = await walk(folder.dir)
       const entries: NoteEntry[] = []
-      for (const rel of files) {
+      for (const local of files) {
+        const rel = `${folder.rel}/${local}`
         const info = await stat(path.join(base, rel)).catch(() => null)
         if (info === null) continue
         const text = info.size > MAX_BODY ? '' : await readFile(path.join(base, rel), 'utf8').catch(() => '')
@@ -284,7 +323,20 @@ export function createNotesOps(readConfig: () => Record<string, unknown>): Notes
         entries.push({ path: rel, title: titleOf(rel, front.lines), updatedAt: info.mtimeMs, size: info.size, excerpt: excerptOf(front.body) })
       }
       entries.sort((a, b) => b.updatedAt - a.updatedAt)
-      return { vaultPath: base, notes: entries }
+      return { vaultPath: base, project: folder.rel, notes: entries }
+    },
+
+    /* Move one note into another project's folder; the file (and its title) is
+       untouched, only the directory changes. */
+    'notes.move': async (args) => {
+      const base = await root()
+      const note = await readNote(base, String(args.path ?? ''))
+      const target = await projectFolder(base, String(args.projectPath ?? ''))
+      if (path.posix.dirname(note.rel) === target.rel) return { path: note.rel, moved: false }
+      const wanted = path.posix.basename(note.rel, MD)
+      const rel = await uniqueRel(base, `${target.rel}/${wanted}`)
+      await rename(note.abs, path.join(base, rel))
+      return { path: rel, moved: true }
     },
 
     'notes.read': async (args) => {
@@ -325,11 +377,12 @@ export function createNotesOps(readConfig: () => Record<string, unknown>): Notes
 
     'notes.create': async (args) => {
       const base = await root()
+      const folder = await projectFolder(base, String(args.projectPath ?? ''))
       /* The title is user-facing text: the client's locale owns it, not this half
          (a hardcoded default here would leak one language into the other). */
       const title = String(args.title ?? '').trim()
       if (title === '') throw new NotesError('notes/bad-title', 'a title is required')
-      const rel = await uniqueRel(base, slugify(title))
+      const rel = await uniqueRel(base, `${folder.rel}/${slugify(title)}`)
       const stamp = new Date().toISOString()
       const lines = upsertFrontmatter([], { title, created: stamp, updated: stamp })
       /* The editor's own title input shows the title; a `# title` block here
@@ -375,11 +428,13 @@ export function createNotesOps(readConfig: () => Record<string, unknown>): Notes
 
     'notes.search': async (args) => {
       const base = await root()
+      const folder = await projectFolder(base, String(args.projectPath ?? ''))
       const query = String(args.query ?? '').trim()
       if (query === '') return { hits: [], truncated: false }
       const needle = query.toLowerCase()
       const hits: { path: string; title: string; line: number; snippet: string }[] = []
-      for (const rel of await walk(base)) {
+      for (const local of await walk(folder.dir)) {
+        const rel = `${folder.rel}/${local}`
         const info = await stat(path.join(base, rel)).catch(() => null)
         if (info === null || info.size > MAX_BODY) continue
         const text = await readFile(path.join(base, rel), 'utf8').catch(() => '')

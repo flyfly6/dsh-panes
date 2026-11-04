@@ -74,6 +74,10 @@ export interface TabRenderProps {
   open: (input: { kind: TabKind; contentId: string; title: string; params?: Record<string, unknown> }) => void
   /** Open a file tab, optionally at a line. */
   openFile: (path: string, line?: number, name?: string) => void
+  /** Rename the current tab in place (a note retitles itself from its frontmatter). */
+  retitle: (title: string) => void
+  /** Every project, for tabs that move their content between them. */
+  projects: { path: string; title: string }[]
 }
 
 export interface TabTypeSpec {
@@ -290,6 +294,29 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
     [open],
   )
 
+  /** Retitle the current tab in place (v0.3: a note's frontmatter owns its name). */
+  const retitle = React.useCallback(
+    (title: string) => {
+      const trimmed = title.trim()
+      if (activeProjectId === null || activeTab === undefined || trimmed === '' || trimmed === activeTab.title) return
+      setLayout((prev) => {
+        const current = prev.projects[activeProjectId]
+        if (current === undefined) return prev
+        return {
+          ...prev,
+          projects: {
+            ...prev.projects,
+            [activeProjectId]: {
+              ...current,
+              tabs: current.tabs.map((tab) => (tab.id === activeTab.id ? { ...tab, title: trimmed } : tab)),
+            },
+          },
+        }
+      })
+    },
+    [activeProjectId, activeTab],
+  )
+
   /** Closing a terminal tab ends its process (R1.13). */
   const closeOne = React.useCallback(
     (id: string) => {
@@ -476,7 +503,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
             <Button variant="ghost" size="icon" title={t('panel.back')} onClick={close}>
               <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
             </Button>
-            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t('sidebar.projects')}</span>
+            <span className="text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t('sidebar.projects')}</span>
             <span className="flex-1" />
             <Button variant="ghost" size="icon" title={t('sidebar.addProject')} onClick={() => void addProjectFromPrompt()}>
               <Plus className="h-3.5 w-3.5" aria-hidden />
@@ -497,7 +524,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
               <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-faint" aria-hidden />
               <Input className="pl-7" placeholder={t('sidebar.filter')} value={filter} onChange={(event) => setFilter(event.target.value)} />
             </div>
-            {sidebarNote !== '' && <div className="mt-1 text-[10px] text-destructive">{sidebarNote}</div>}
+            {sidebarNote !== '' && <div className="mt-1 text-2xs text-destructive">{sidebarNote}</div>}
           </div>
           <div className="wb-scroll flex-1 overflow-auto px-1.5">
             {visibleProjects.map((item) => {
@@ -522,18 +549,18 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
                     <span className="flex items-center gap-1.5">
                       <span className="truncate text-sm font-medium text-foreground">{item.title}</span>
                     </span>
-                    <span className="block truncate text-[10px] leading-4 text-muted-foreground">{shortPath(item.path, home)}</span>
+                    <span className="block truncate text-2xs leading-4 text-muted-foreground">{shortPath(item.path, home)}</span>
                   </span>
                   <span className="shrink-0 self-start pt-0.5">
                     {item.running ? (
-                      <span className="flex items-center gap-1 text-[10px] text-[#1A7F37]">
+                      <span className="flex items-center gap-1 text-2xs text-[#1A7F37]">
                         <Circle className="h-1.5 w-1.5 fill-current" aria-hidden />
                         {t('sidebar.running')}
                       </span>
                     ) : (
                       <span
                         className={cn(
-                          'flex items-center gap-1 rounded-full px-1.5 text-[10px]',
+                          'flex items-center gap-1 rounded-full px-1.5 text-2xs',
                           activeRow ? 'bg-background text-foreground shadow-[inset_0_0_0_1px_var(--border)]' : 'text-muted-foreground',
                         )}
                       >
@@ -557,7 +584,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
             </button>
             {apps !== undefined && apps.length > 0 && (
               <div className="border-t border-border py-1">
-                <div className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <div className="px-3 pb-1 pt-1.5 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                   {t('sidebar.apps')}
                 </div>
                 {apps.map((app) => (
@@ -635,7 +662,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
               {icon ?? <KindIcon kind={tab.kind} />}
               <span className="truncate">{tab.title}</span>
               {tab.kind === 'git' && git !== null && git.changes > 0 && (
-                <span className="wb-badge rounded-full px-1 text-[10px] leading-4">{git.changes}</span>
+                <span className="wb-badge rounded-full px-1 text-2xs leading-4">{git.changes}</span>
               )}
               <button
                 type="button"
@@ -663,7 +690,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[248px]">
-            <div className="px-2 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            <div className="px-2 pb-1 pt-1.5 text-2xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               {t('tabs.newHeader')}
             </div>
             {newTabItems.map((item, index) => (
@@ -671,7 +698,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
                 {index === 7 && <DropdownMenuSeparator />}
                 <DropdownMenuItem icon={item.icon} onSelect={() => createTab(item.kind)}>
                   <span className="flex-1">{item.label}</span>
-                  {item.hint !== undefined && <span className="pl-4 text-[10px] text-muted-foreground">{item.hint}</span>}
+                  {item.hint !== undefined && <span className="pl-4 text-2xs text-muted-foreground">{item.hint}</span>}
                 </DropdownMenuItem>
               </React.Fragment>
             ))}
@@ -763,7 +790,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
           ))}
         </span>
       )}
-      <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">{crumbMeta}</span>
+      <span className="ml-auto shrink-0 text-2xs text-muted-foreground">{crumbMeta}</span>
     </div>
   )
 
@@ -893,6 +920,8 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
           sessionId: project?.sessionIds[0],
           open,
           openFile,
+          retitle,
+          projects: projects.map((item) => ({ path: item.path, title: item.title })),
         })}
       </Guarded>
     )
@@ -907,7 +936,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
 
   const isFileTab = activeTab?.kind === 'file'
   const statusBar = (
-    <div className="flex h-status shrink-0 items-center gap-3 border-t border-border bg-[var(--card)] px-3 text-[10px] text-muted-foreground">
+    <div className="flex h-status shrink-0 items-center gap-3 border-t border-border bg-[var(--card)] px-3 text-2xs text-muted-foreground">
       <span className="flex items-center gap-1.5">
         <Folder className="h-3 w-3" aria-hidden />
         <span className="max-w-[180px] truncate text-foreground">{project?.title ?? ''}</span>
@@ -925,10 +954,10 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
           {git.behind > 0 && <span className="text-[#CF222E]">−{git.behind}</span>}
         </button>
       )}
-      {project !== undefined && project.sessionIds.length > 0 && (
+      {state.tabs.length > 0 && (
         <span className="flex items-center gap-1">
           <Box className="h-3 w-3" aria-hidden />
-          {project.sessionIds.length} {t('status.running')}
+          {state.tabs.length} {t('status.tabs')}
         </span>
       )}
       <span className="ml-auto flex items-center gap-3">
@@ -941,10 +970,16 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
         )}
         {isFileTab && <span>UTF-8</span>}
         {isFileTab && activeTab !== undefined && <span>{languageLabel(activeTab.contentId)}</span>}
-        <span className="flex items-center gap-1">
+        <button
+          type="button"
+          className="flex items-center gap-1 rounded px-0.5 enabled:hover:bg-accent enabled:hover:text-foreground disabled:cursor-default"
+          onClick={props.toggleTheme}
+          disabled={props.toggleTheme === undefined}
+          title={t('status.themeToggle')}
+        >
           {dark ? <Moon className="h-3 w-3" aria-hidden /> : <Sun className="h-3 w-3" aria-hidden />}
           {dark ? t('status.dark') : t('status.light')}
-        </span>
+        </button>
       </span>
     </div>
   )

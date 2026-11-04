@@ -40,7 +40,16 @@ function hasUnsupportedSyntax(markdown: string): boolean {
   return /\[\^[^\]]+\]/.test(withoutCode) || /<\/?[a-z][^>]*>/i.test(withoutCode)
 }
 
-export function NoteEditor({ path, t }: { path: string; t: Translate }) {
+export function NoteEditor({
+  path,
+  t,
+  onTitle,
+}: {
+  path: string
+  t: Translate
+  /** Push the frontmatter title to the shell so tab + breadcrumb stay in sync. */
+  onTitle?: (title: string) => void
+}) {
   const [doc, setDoc] = React.useState<NoteDoc | null>(null)
   const [error, setError] = React.useState('')
 
@@ -67,9 +76,13 @@ export function NoteEditor({ path, t }: { path: string; t: Translate }) {
     }
   }, [path])
 
+  React.useEffect(() => {
+    if (doc !== null && doc.title !== '') onTitle?.(doc.title)
+  }, [doc, onTitle])
+
   if (error !== '') return <div className="p-4 text-xs text-muted-foreground">{error}</div>
   if (doc === null) return <div className="p-4 text-xs text-muted-foreground">{t('notes.loading')}</div>
-  return <NoteBody key={doc.path} initial={doc} t={t} />
+  return <NoteBody key={doc.path} initial={doc} t={t} onTitle={onTitle} />
 }
 
 /** How the note was last touched, in words (design: "最后编辑 2 分钟前"). */
@@ -84,7 +97,7 @@ function editedAgo(iso: string, t: Translate): string {
   return t('notes.edited.days').replace('{n}', String(Math.round(hours / 24)))
 }
 
-function NoteBody({ initial, t }: { initial: NoteDoc; t: Translate }) {
+function NoteBody({ initial, t, onTitle }: { initial: NoteDoc; t: Translate; onTitle?: (title: string) => void }) {
   /* The editor starts empty and the markdown is loaded in an effect: parsing
      needs the instance, and BlockNoteView must not mount twice per load. */
   const editor = useCreateBlockNote()
@@ -131,6 +144,7 @@ function NoteBody({ initial, t }: { initial: NoteDoc; t: Translate }) {
         etag.current = written.etag
         setStatus('saved')
         setNoteDirty(initial.path, false)
+        if (title.trim() !== '') onTitle?.(title.trim())
       } catch (failure) {
         if ((failure as { code?: string }).code === 'notes/conflict') {
           setStatus('conflict')
@@ -140,7 +154,7 @@ function NoteBody({ initial, t }: { initial: NoteDoc; t: Translate }) {
         setStatus('dirty')
       }
     },
-    [editor, initial.path, title],
+    [editor, initial.path, title, onTitle],
   )
 
   const schedule = React.useCallback(() => {
