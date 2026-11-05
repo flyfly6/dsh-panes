@@ -83,8 +83,8 @@ export interface TabRenderProps {
   open: (input: { kind: TabKind; contentId: string; title: string; params?: Record<string, unknown> }) => void
   /** Open a file tab, optionally at a line. */
   openFile: (path: string, line?: number, name?: string) => void
-  /** Rename the current tab in place (a note retitles itself from its frontmatter). */
-  retitle: (title: string) => void
+  /** Rename a tab in place (a note retitles itself from its frontmatter). */
+  retitle: (title: string, tabId?: string) => void
   /** Every project, for tabs that move their content between them. */
   projects: { path: string; title: string }[]
 }
@@ -641,21 +641,23 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
     [open],
   )
 
-  /** Retitle the current tab in place (v0.3: a note's frontmatter owns its name). */
+  /** Retitle a tab in place (v0.3: a note's frontmatter owns its name). */
   const retitle = React.useCallback(
-    (title: string) => {
+    (title: string, tabId?: string) => {
       const trimmed = title.trim()
-      if (activeProjectId === null || activeTab === undefined || trimmed === '' || trimmed === activeTab.title) return
+      const targetId = tabId ?? activeTab?.id
+      if (activeProjectId === null || targetId === undefined || trimmed === '') return
       setLayout((prev) => {
         const current = prev.projects[activeProjectId]
-        if (current === undefined) return prev
+        const target = current?.tabs.find((tab) => tab.id === targetId)
+        if (current === undefined || target === undefined || target.title === trimmed) return prev
         return {
           ...prev,
           projects: {
             ...prev.projects,
             [activeProjectId]: {
               ...current,
-              tabs: current.tabs.map((tab) => (tab.id === activeTab.id ? { ...tab, title: trimmed } : tab)),
+              tabs: current.tabs.map((tab) => (tab.id === targetId ? { ...tab, title: trimmed } : tab)),
             },
           },
         }
@@ -1459,7 +1461,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
             SessionProvider={(props as any).SessionProvider}
             renderSlot={(props as any).renderSlot}
             retainSession={props.retainSession}
-            retitle={retitle}
+            retitle={(title) => retitle(title, tab.id)}
             forkSession={props.forkSession}
             t={t}
           />
@@ -1496,7 +1498,7 @@ export function WorkbenchPanel(props: PanelProps & { registry: TabRegistry; appe
           sessionId: project?.sessionIds[0],
           open,
           openFile,
-          retitle,
+          retitle: (title: string, tabId?: string) => retitle(title, tabId ?? tab.id),
           projects: projects.map((item) => ({ path: item.path, title: item.title })),
         })}
       </Guarded>

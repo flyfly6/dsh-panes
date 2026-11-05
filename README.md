@@ -127,9 +127,9 @@ Per view: `⌘G` jump to line (file), `⌘⇧V` preview/source (Markdown), `⌘S
 
 ## Settings
 
-Plugins → **dsh-panes**. Every field is live — no restart.
-
-![Appearance settings](assets/06-appearance-settings.png)
+Plugins → **dsh-panes** lands on the plugin page, where the Git card is rendered in place.
+The workspace fields below are the same plugin row's config, which the Host edits from
+**Settings → 打开配置文件**. Every field is live — no restart.
 
 | Field | Meaning |
 |---|---|
@@ -196,6 +196,10 @@ profile needs a client restart.
   but has no composer write entry, so quoting a selection back into the fork is
   not implemented. A fork also needs a completed turn to split from, so a brand
   new session cannot be forked yet.
+- **Font and startup fields have no form controls of their own**: the Host's
+  plugin page only renders the Git card (registered through the settings-card
+  slot), so the workspace fields are edited in the plugin row config through
+  **Settings → 打开配置文件**. They still apply live.
 - **Search and notes act on client-supplied absolute paths**, fenced by the
   plugin header + same-origin check rather than by "must be inside a registered
   workspace" (the host exposes no workspace list to the host half). Treat the
